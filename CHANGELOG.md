@@ -10,6 +10,8 @@ This project follows semantic versioning where practical:
 
 ## Unreleased
 
+- Added a left source tree that filters by all sources, World folders, unfiled World actors, and Actor compendiums.
+
 ## 0.2.1
 
 - Migrated the gallery and settings launcher from legacy Application classes to Foundry ApplicationV2.

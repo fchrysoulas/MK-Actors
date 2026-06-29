@@ -17,7 +17,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Browse visible Actor compendiums.
 - Search by name, Actor type, source, or compendium ID.
 - Filter by Actor type.
-- Filter by source.
+- Filter by source from a left tree view with World folders, unfiled World actors, and Actor compendiums.
 - Drag cards onto a Scene.
 - Drag from an Actor portrait as part of the card.
 - Double-click an Actor card to open its sheet.

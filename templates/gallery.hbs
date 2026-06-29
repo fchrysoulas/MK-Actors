@@ -14,15 +14,6 @@
       </select>
     </label>
 
-    <label>
-      <span>{{localize 'MKACTORS.Source'}}</span>
-      <select name="source" data-action="source">
-        {{#each sources}}
-          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
-        {{/each}}
-      </select>
-    </label>
-
     <button type="button" data-action="clear" title="{{localize 'MKACTORS.Clear'}}">
       <i class="fas fa-eraser"></i>
     </button>
@@ -32,49 +23,71 @@
     </button>
   </header>
 
-  <div class="mk-actors__summary">
-    <span data-role="result-count">{{actors.length}}</span>
-    <span>{{localize 'MKACTORS.ActorsCountLabel'}}</span>
-    {{#if warnings}}
-      <span class="mk-actors__warning"><i class="fas fa-triangle-exclamation"></i> {{warnings.length}} {{localize 'MKACTORS.SourceWarnings'}}</span>
-    {{/if}}
-  </div>
+  <div class="mk-actors__body">
+    <aside class="mk-actors__sources" aria-label="{{localize 'MKACTORS.SourcesTree'}}">
+      <div class="mk-actors__sources-title">{{localize 'MKACTORS.SourcesTree'}}</div>
+      <nav class="mk-actors__source-tree">
+        {{#each sourceTree}}
+          <button type="button"
+                  class="{{#if selected}}is-selected{{/if}}"
+                  data-action="source-tree"
+                  data-source="{{value}}"
+                  style="--mk-tree-depth: {{depth}};"
+                  title="{{label}}">
+            <i class="{{icon}}"></i>
+            <span>{{label}}</span>
+            <em>{{count}}</em>
+          </button>
+        {{/each}}
+      </nav>
+    </aside>
 
-  {{#if hasActors}}
-    <ol class="mk-actors__grid" data-role="grid">
-      {{#each actors}}
-        <li class="mk-actors__card"
-            draggable="true"
-            data-action="drag-actor"
-            data-uuid="{{uuid}}"
-            data-name="{{name}}"
-            data-type="{{type}}"
-            data-source-kind="{{sourceKind}}"
-            data-source-id="{{sourceId}}"
-            data-search="{{searchText}}"
-            title="{{localize 'MKACTORS.CardHint'}}">
-          <div class="mk-actors__portrait">
-            <img src="{{img}}" alt="{{name}}" loading="lazy" draggable="false" data-action="edit-token-portrait" onerror="this.src='icons/svg/mystery-man.svg';">
-          </div>
-          <div class="mk-actors__content">
-            <h3>{{name}}</h3>
-            <div class="mk-actors__badges">
-              {{#if typeLabel}}<span>{{typeLabel}}</span>{{/if}}
-              <span>{{sourceLabel}}</span>
-            </div>
-          </div>
-          <div class="mk-actors__actions">
-            <button type="button" data-action="open-sheet" data-uuid="{{uuid}}" title="{{localize 'MKACTORS.OpenSheet'}}">
-              <i class="fas fa-up-right-from-square"></i>
-            </button>
-          </div>
-        </li>
-      {{/each}}
-    </ol>
-  {{else}}
-    <div class="mk-actors__empty">
-      <i class="fas fa-users-slash"></i>
-      <p>{{localize 'MKACTORS.NoActors'}}</p>
-    </div>
-  {{/if}}
+    <main class="mk-actors__main">
+      <div class="mk-actors__summary">
+        <span data-role="result-count">{{actors.length}}</span>
+        <span>{{localize 'MKACTORS.ActorsCountLabel'}}</span>
+        {{#if warnings}}
+          <span class="mk-actors__warning"><i class="fas fa-triangle-exclamation"></i> {{warnings.length}} {{localize 'MKACTORS.SourceWarnings'}}</span>
+        {{/if}}
+      </div>
+
+      {{#if hasActors}}
+        <ol class="mk-actors__grid" data-role="grid">
+          {{#each actors}}
+            <li class="mk-actors__card"
+                draggable="true"
+                data-action="drag-actor"
+                data-uuid="{{uuid}}"
+                data-name="{{name}}"
+                data-type="{{type}}"
+                data-source-kind="{{sourceKind}}"
+                data-source-id="{{sourceId}}"
+                data-search="{{searchText}}"
+                title="{{localize 'MKACTORS.CardHint'}}">
+              <div class="mk-actors__portrait">
+                <img src="{{img}}" alt="{{name}}" loading="lazy" draggable="false" data-action="edit-token-portrait" onerror="this.src='icons/svg/mystery-man.svg';">
+              </div>
+              <div class="mk-actors__content">
+                <h3>{{name}}</h3>
+                <div class="mk-actors__badges">
+                  {{#if typeLabel}}<span>{{typeLabel}}</span>{{/if}}
+                  <span>{{sourceLabel}}</span>
+                </div>
+              </div>
+              <div class="mk-actors__actions">
+                <button type="button" data-action="open-sheet" data-uuid="{{uuid}}" title="{{localize 'MKACTORS.OpenSheet'}}">
+                  <i class="fas fa-up-right-from-square"></i>
+                </button>
+              </div>
+            </li>
+          {{/each}}
+        </ol>
+      {{else}}
+        <div class="mk-actors__empty">
+          <i class="fas fa-users-slash"></i>
+          <p>{{localize 'MKACTORS.NoActors'}}</p>
+        </div>
+      {{/if}}
+    </main>
+  </div>
 </section>

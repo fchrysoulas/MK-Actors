@@ -79,13 +79,13 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     const allActors = await this.getActorEntries();
     const filteredByControls = this.filterByControls(allActors);
     const types = this.getTypeOptions(allActors);
-    const sources = this.getSourceOptions(allActors);
+    const sourceTree = this.getSourceTree(allActors);
     const cardSize = Number(game.settings.get(MODULE_ID, "cardSize")) || 150;
     debugLog("Gallery data prepared", {
       totalActors: allActors.length,
       visibleActors: filteredByControls.length,
       types: types.length,
-      sources: sources.length,
+      treeItems: sourceTree.length,
       cardSize
     });
 
@@ -93,7 +93,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       actors: filteredByControls,
       hasActors: filteredByControls.length > 0,
       types,
-      sources,
+      sourceTree,
       state: this.filters,
       cardSize,
       warnings: this.warnings
@@ -116,11 +116,13 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       this.render(false);
     });
 
-    root.querySelector?.("[data-action='source']")?.addEventListener("change", (event) => {
-      this.filters.source = event.currentTarget.value || "";
-      debugLog("Source filter changed", { source: this.filters.source });
-      this.render(false);
-    });
+    for (const button of root.querySelectorAll?.("[data-action='source-tree']") || []) {
+      button.addEventListener("click", (event) => {
+        this.filters.source = event.currentTarget.dataset.source || "";
+        debugLog("Source tree filter changed", { source: this.filters.source });
+        this.render(false);
+      });
+    }
 
     root.querySelector?.("[data-action='clear']")?.addEventListener("click", () => {
       this.filters.search = "";
@@ -209,6 +211,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
           img: getActorImage(actor),
           type,
           typeLabel: titleCase(type),
+          folderId: this.getActorFolderId(actor),
+          folderPathIds: this.getActorFolderPathIds(actor),
           sourceKind: "world",
           sourceId: "world",
           sourceLabel,
@@ -218,6 +222,47 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       });
     debugLog("World Actor entries loaded", { count: entries.length });
     return entries;
+  }
+
+  getActorFolderId(actor) {
+    const folder = actor.folder;
+    if (!folder) return "";
+    if (typeof folder === "string") return folder;
+    return folder.id || "";
+  }
+
+  getActorFolderPathIds(actor) {
+    const folderId = this.getActorFolderId(actor);
+    if (!folderId) return [];
+
+    const folderById = this.getWorldActorFolderMap();
+    const pathIds = [];
+    let currentId = folderId;
+    const seen = new Set();
+
+    while (currentId && !seen.has(currentId)) {
+      seen.add(currentId);
+      pathIds.push(currentId);
+      currentId = this.getFolderParentId(folderById.get(currentId));
+    }
+
+    return pathIds;
+  }
+
+  getWorldActorFolderMap() {
+    const folders = game.folders?.contents || [];
+    return new Map(folders
+      .filter((folder) => (folder.type || folder.documentName) === "Actor")
+      .map((folder) => [folder.id, folder]));
+  }
+
+  getFolderParentId(folder) {
+    if (!folder) return "";
+    if (typeof folder.folder === "string") return folder.folder;
+    if (folder.folder?.id) return folder.folder.id;
+    if (typeof folder.parent === "string") return folder.parent;
+    if (folder.parent?.id) return folder.parent.id;
+    return folder._source?.folder || "";
   }
 
   async getCompendiumActorEntries() {
@@ -269,9 +314,23 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   filterByControls(entries) {
     return entries.filter((entry) => {
       if (this.filters.type && entry.type !== this.filters.type) return false;
-      if (this.filters.source && entry.sourceId !== this.filters.source) return false;
+      if (this.filters.source && !this.sourceAllowed(entry, this.filters.source)) return false;
       return true;
     });
+  }
+
+  sourceAllowed(entry, source) {
+    if (source === "world") return entry.sourceKind === "world";
+    if (source === "world-unfiled") return entry.sourceKind === "world" && !entry.folderId;
+    if (source.startsWith("world-folder:")) {
+      const folderId = source.slice("world-folder:".length);
+      return entry.sourceKind === "world" && entry.folderPathIds?.includes(folderId);
+    }
+    if (source.startsWith("compendium:")) {
+      const sourceId = source.slice("compendium:".length);
+      return entry.sourceKind === "compendium" && entry.sourceId === sourceId;
+    }
+    return entry.sourceId === source;
   }
 
   getTypeOptions(entries) {
@@ -292,20 +351,116 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     ];
   }
 
-  getSourceOptions(entries) {
-    const sources = new Map();
-    for (const entry of entries) sources.set(entry.sourceId, entry.sourceLabel);
-
-    return [
+  getSourceTree(entries) {
+    const selected = this.filters.source || "";
+    const worldEntries = entries.filter((entry) => entry.sourceKind === "world");
+    const compendiumEntries = entries.filter((entry) => entry.sourceKind === "compendium");
+    const tree = [
       {
         value: "",
         label: game.i18n.localize("MKACTORS.AllSources"),
-        selected: this.filters.source === ""
-      },
-      ...Array.from(sources.entries())
-        .sort((a, b) => a[1].localeCompare(b[1], game.i18n.lang))
-        .map(([value, label]) => ({ value, label, selected: this.filters.source === value }))
+        icon: "fas fa-layer-group",
+        count: entries.length,
+        depth: 0,
+        selected: selected === ""
+      }
     ];
+
+    if (worldEntries.length) {
+      tree.push({
+        value: "world",
+        label: game.i18n.localize("MKACTORS.World"),
+        icon: "fas fa-globe",
+        count: worldEntries.length,
+        depth: 0,
+        selected: selected === "world"
+      });
+
+      tree.push(...this.getWorldFolderTreeItems(worldEntries, selected));
+    }
+
+    const compendiumCounts = new Map();
+    for (const entry of compendiumEntries) {
+      const current = compendiumCounts.get(entry.sourceId) || {
+        value: `compendium:${entry.sourceId}`,
+        label: entry.sourceLabel,
+        icon: "fas fa-book-atlas",
+        count: 0,
+        depth: 0,
+        selected: selected === `compendium:${entry.sourceId}`
+      };
+      current.count += 1;
+      compendiumCounts.set(entry.sourceId, current);
+    }
+
+    tree.push(...Array.from(compendiumCounts.values())
+      .sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang)));
+
+    return tree;
+  }
+
+  getWorldFolderTreeItems(worldEntries, selected) {
+    const folderById = this.getWorldActorFolderMap();
+    const childrenByParent = new Map();
+    const directCounts = new Map();
+    const subtreeCounts = new Map();
+    let unfiledCount = 0;
+
+    for (const folder of folderById.values()) {
+      const parentId = this.getFolderParentId(folder);
+      if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+      childrenByParent.get(parentId).push(folder);
+    }
+
+    for (const entry of worldEntries) {
+      if (!entry.folderId) {
+        unfiledCount += 1;
+        continue;
+      }
+
+      directCounts.set(entry.folderId, (directCounts.get(entry.folderId) || 0) + 1);
+      for (const folderId of entry.folderPathIds || []) {
+        subtreeCounts.set(folderId, (subtreeCounts.get(folderId) || 0) + 1);
+      }
+    }
+
+    for (const children of childrenByParent.values()) {
+      children.sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
+    }
+
+    const items = [];
+    const visit = (parentId, depth) => {
+      for (const folder of childrenByParent.get(parentId) || []) {
+        const count = subtreeCounts.get(folder.id) || directCounts.get(folder.id) || 0;
+        if (!count) continue;
+
+        const value = `world-folder:${folder.id}`;
+        items.push({
+          value,
+          label: folder.name || game.i18n.localize("MKACTORS.UnnamedFolder"),
+          icon: "fas fa-folder",
+          count,
+          depth,
+          selected: selected === value
+        });
+        visit(folder.id, depth + 1);
+      }
+    };
+
+    visit("", 1);
+
+    if (unfiledCount) {
+      items.push({
+        value: "world-unfiled",
+        label: game.i18n.localize("MKACTORS.Unfiled"),
+        icon: "fas fa-folder-open",
+        count: unfiledCount,
+        depth: 1,
+        selected: selected === "world-unfiled"
+      });
+    }
+
+    return items;
   }
 
   buildSearchText(...parts) {
