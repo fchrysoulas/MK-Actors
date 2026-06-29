@@ -26,6 +26,7 @@
   "MKACTORS.SourceWarningsConsole": "MK Actors source warnings",
   "MKACTORS.OpenSheet": "Open Sheet",
   "MKACTORS.DragHint": "Drag this card onto the scene to create a token.",
+  "MKACTORS.CardHint": "Drag this card onto the scene to create a token, or double-click to open its sheet.",
   "MKACTORS.NoActors": "No Actors matched the current filters.",
   "MKACTORS.World": "World",
   "MKACTORS.Compendium": "Compendium",

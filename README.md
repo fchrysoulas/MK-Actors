@@ -19,6 +19,8 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Filter by Actor type.
 - Filter by source.
 - Drag cards onto a Scene.
+- Drag from an Actor portrait as part of the card.
+- Double-click an Actor card to open its sheet.
 - Open an Actor sheet from the gallery.
 - GM-only action to spawn an Actor near the current canvas view center.
 - Configurable included and excluded Actor type IDs.

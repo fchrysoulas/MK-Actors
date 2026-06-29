@@ -226,6 +226,7 @@ class MKActorsApp extends Application {
 
     for (const card of root.querySelectorAll?.("[data-action='drag-actor']") || []) {
       card.addEventListener("dragstart", this.onDragStart.bind(this));
+      card.addEventListener("dblclick", this.onCardDoubleClick.bind(this));
     }
 
     for (const button of root.querySelectorAll?.("[data-action='open-sheet']") || []) {
@@ -406,11 +407,7 @@ class MKActorsApp extends Application {
     event.dataTransfer.effectAllowed = "copy";
   }
 
-  async onOpenSheet(event) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const uuid = event.currentTarget.dataset.uuid;
+  async openActorSheet(uuid) {
     const actor = await MKActorsApi.resolveActor(uuid);
     if (!actor) {
       ui.notifications.warn(game.i18n.localize("MKACTORS.CannotResolveActor"));
@@ -418,6 +415,22 @@ class MKActorsApp extends Application {
     }
 
     actor.sheet?.render(true);
+  }
+
+  async onCardDoubleClick(event) {
+    if (event.target.closest?.("button, input, select, textarea, a")) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    await this.openActorSheet(event.currentTarget.dataset.uuid);
+  }
+
+  async onOpenSheet(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    await this.openActorSheet(event.currentTarget.dataset.uuid);
   }
 
   async onSpawnCenter(event) {

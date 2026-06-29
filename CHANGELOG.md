@@ -10,7 +10,11 @@ This project follows semantic versioning where practical:
 
 ## Unreleased
 
-## 0.1.1 - 2026-06-29
+- Added double-click opening for Actor cards.
+- Improved portrait dragging so dragging from an Actor image uses the Actor card drag data.
+- Added GitHub release URLs to the source module manifest.
+
+## 0.1.1
 
 - Added shared repository instructions in `AGENTS.md`.
 - Added this changelog and versioning notes.
@@ -20,7 +24,7 @@ This project follows semantic versioning where practical:
 - Localized remaining gallery summary text.
 - Hid the direct spawn button for non-GM users.
 
-## 0.1.0 - Initial Release
+## 0.1.0
 
 - Added a system-agnostic Foundry VTT v12-v13 Actor gallery.
 - Added support for browsing world Actors.
