@@ -94,6 +94,8 @@ Then restart Foundry, enable **MK Actors** in your world, and open the gallery.
 
 ```text
 mk-actors/
+  AGENTS.md
+  CHANGELOG.md
   module.json
   README.md
   lang/en.json
@@ -101,6 +103,10 @@ mk-actors/
   styles/gallery.css
   templates/gallery.hbs
 ```
+
+## Version history
+
+See `CHANGELOG.md` for release notes and versioning guidance.
 
 ## Suggested next upgrades
 
