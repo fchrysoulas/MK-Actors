@@ -1,0 +1,32 @@
+{
+  "id": "mk-actors",
+  "title": "MK Actors",
+  "description": "A system-agnostic Foundry VTT gallery for browsing Actor documents and dragging NPCs, monsters, creatures, or any configured Actor type onto a Scene.",
+  "authors": [
+    {
+      "name": "Mikro Kouneli / Fotis"
+    }
+  ],
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "13"
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/gallery.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "url": "",
+  "manifest": "",
+  "download": "",
+  "license": "MIT"
+}
