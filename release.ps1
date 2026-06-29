@@ -18,7 +18,7 @@ Builds the local Foundry release assets.
 .\release.ps1 -Publish
 
 Builds the assets, creates or updates the GitHub release, and attaches
-module.json and mk-shadowdark-crafting.zip.
+module.json and mk-actors.zip.
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
@@ -376,7 +376,7 @@ function Get-ChangelogSection {
   }
 
   $versionPattern = [regex]::Escape($Version)
-  $headingPattern = "^\s*##\s+\[?v?$versionPattern\]?\s*$"
+  $headingPattern = "^\s*##\s+\[?v?$versionPattern\]?(?:\s+-\s+.*)?\s*$"
   $capturing = $false
   $lines = [System.Collections.Generic.List[string]]::new()
 

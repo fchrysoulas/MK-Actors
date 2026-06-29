@@ -10,9 +10,15 @@ This project follows semantic versioning where practical:
 
 ## Unreleased
 
+## 0.1.1 - 2026-06-29
+
 - Added shared repository instructions in `AGENTS.md`.
 - Added this changelog and versioning notes.
 - Added a repository `.gitignore` for local tooling and release artifacts.
+- Fixed release note extraction for titled changelog version headings.
+- Clarified spawn wording to match view-center behavior.
+- Localized remaining gallery summary text.
+- Hid the direct spawn button for non-GM users.
 
 ## 0.1.0 - Initial Release
 
@@ -23,7 +29,7 @@ This project follows semantic versioning where practical:
 - Added Actor type and source filters.
 - Added draggable Actor cards using Foundry's standard Actor drag data.
 - Added Actor sheet opening from gallery cards.
-- Added GM-only spawn at Scene center behavior.
+- Added GM-only spawn near the current canvas view center.
 - Added configurable included and excluded Actor type IDs.
 - Added client-side card size setting.
 - Added English localization.

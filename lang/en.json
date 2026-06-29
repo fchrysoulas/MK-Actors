@@ -21,6 +21,9 @@
   "MKACTORS.AllSources": "All Sources",
   "MKACTORS.Refresh": "Refresh",
   "MKACTORS.Clear": "Clear",
+  "MKACTORS.ActorsCountLabel": "Actors",
+  "MKACTORS.SourceWarnings": "source warnings",
+  "MKACTORS.SourceWarningsConsole": "MK Actors source warnings",
   "MKACTORS.OpenSheet": "Open Sheet",
   "MKACTORS.DragHint": "Drag this card onto the scene to create a token.",
   "MKACTORS.NoActors": "No Actors matched the current filters.",
@@ -30,5 +33,5 @@
   "MKACTORS.CannotResolveActor": "MK Actors | Could not resolve that Actor.",
   "MKACTORS.SceneRequired": "MK Actors | Open a Scene before spawning an Actor.",
   "MKACTORS.GMRequired": "MK Actors | You need GM permissions to spawn Actors directly. Drag-and-drop may still work if your permissions allow it.",
-  "MKACTORS.SpawnCenter": "Spawn at Scene Center"
+  "MKACTORS.SpawnCenter": "Spawn at View Center"
 }

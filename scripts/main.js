@@ -58,20 +58,20 @@ class MKActorsApi {
     }
   }
 
-  static getSceneCenterPosition() {
+  static getViewCenterPosition() {
     const scene = canvas?.scene;
     const gridSize = canvas?.grid?.size || scene?.grid?.size || 100;
     let x = Number(scene?.width || 0) / 2;
     let y = Number(scene?.height || 0) / 2;
 
     try {
-      const viewPosition = scene?._viewPosition;
-      if (viewPosition && Number.isFinite(viewPosition.x) && Number.isFinite(viewPosition.y)) {
-        x = viewPosition.x;
-        y = viewPosition.y;
-      } else if (canvas?.stage?.worldTransform && canvas?.app?.view) {
+      if (canvas?.stage?.worldTransform && canvas?.app?.view) {
         const rect = canvas.app.view.getBoundingClientRect();
-        const point = new PIXI.Point(rect.width / 2, rect.height / 2);
+        const Point = globalThis.PIXI?.Point;
+        const point = Point ? new Point(rect.width / 2, rect.height / 2) : {
+          x: rect.width / 2,
+          y: rect.height / 2
+        };
         const world = canvas.stage.worldTransform.applyInverse(point);
         x = world.x;
         y = world.y;
@@ -86,6 +86,10 @@ class MKActorsApi {
     };
   }
 
+  static getSceneCenterPosition() {
+    return this.getViewCenterPosition();
+  }
+
   static async resolveActor(uuid) {
     const document = await fromUuid(uuid);
     if (!document) return null;
@@ -94,7 +98,7 @@ class MKActorsApi {
     return null;
   }
 
-  static async spawnAtSceneCenter(uuid) {
+  static async spawnAtViewCenter(uuid) {
     if (!game.user?.isGM) {
       ui.notifications.warn(game.i18n.localize("MKACTORS.GMRequired"));
       return null;
@@ -116,7 +120,7 @@ class MKActorsApi {
       actor = await Actor.create(actor.toObject(), { renderSheet: false });
     }
 
-    const position = this.getSceneCenterPosition();
+    const position = this.getViewCenterPosition();
     let tokenData;
 
     if (actor.getTokenDocument) {
@@ -134,6 +138,10 @@ class MKActorsApi {
     }
 
     return canvas.scene.createEmbeddedDocuments("Token", [tokenData]);
+  }
+
+  static async spawnAtSceneCenter(uuid) {
+    return this.spawnAtViewCenter(uuid);
   }
 }
 
@@ -180,6 +188,7 @@ class MKActorsApp extends Application {
       sources,
       state: this.state,
       cardSize,
+      canSpawn: game.user?.isGM,
       warnings: this.warnings
     };
   }
@@ -253,7 +262,7 @@ class MKActorsApp extends Application {
 
     if (this.warnings.length) {
       ui.notifications.warn(game.i18n.localize("MKACTORS.LoadingFailed"));
-      console.warn("MK Actors source warnings", this.warnings);
+      console.warn(game.i18n.localize("MKACTORS.SourceWarningsConsole"), this.warnings);
     }
 
     return this.cache;
@@ -416,7 +425,7 @@ class MKActorsApp extends Application {
     event.stopPropagation();
 
     const uuid = event.currentTarget.dataset.uuid;
-    await MKActorsApi.spawnAtSceneCenter(uuid);
+    await MKActorsApi.spawnAtViewCenter(uuid);
   }
 }
 

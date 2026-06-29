@@ -34,9 +34,9 @@
 
   <div class="mk-actors__summary">
     <span data-role="result-count">{{actors.length}}</span>
-    <span>Actors</span>
+    <span>{{localize 'MKACTORS.ActorsCountLabel'}}</span>
     {{#if warnings}}
-      <span class="mk-actors__warning"><i class="fas fa-triangle-exclamation"></i> {{warnings.length}} source warnings</span>
+      <span class="mk-actors__warning"><i class="fas fa-triangle-exclamation"></i> {{warnings.length}} {{localize 'MKACTORS.SourceWarnings'}}</span>
     {{/if}}
   </div>
 
@@ -67,9 +67,11 @@
             <button type="button" data-action="open-sheet" data-uuid="{{uuid}}" title="{{localize 'MKACTORS.OpenSheet'}}">
               <i class="fas fa-up-right-from-square"></i>
             </button>
-            <button type="button" data-action="spawn-center" data-uuid="{{uuid}}" title="{{localize 'MKACTORS.SpawnCenter'}}">
-              <i class="fas fa-location-crosshairs"></i>
-            </button>
+            {{#if ../canSpawn}}
+              <button type="button" data-action="spawn-center" data-uuid="{{uuid}}" title="{{localize 'MKACTORS.SpawnCenter'}}">
+                <i class="fas fa-location-crosshairs"></i>
+              </button>
+            {{/if}}
           </div>
         </li>
       {{/each}}
