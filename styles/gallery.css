@@ -202,13 +202,30 @@
 }
 
 .mk-actors-token-editor__row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
   gap: 6px;
   align-items: center;
 }
 
 .mk-actors-token-editor__row input {
-  flex: 1;
+  min-width: 0;
+}
+
+.mk-actors-token-editor__browse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  line-height: 1;
+}
+
+.mk-actors-token-editor__browse i {
+  margin: 0;
 }
 
 .mk-actors-token-editor__dimensions {

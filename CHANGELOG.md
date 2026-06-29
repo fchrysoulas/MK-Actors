@@ -1,3 +1,5 @@
+
+
 # Changelog
 
 All notable changes to MK Actors will be documented in this file.
@@ -9,6 +11,9 @@ This project follows semantic versioning where practical:
 - `PATCH` versions fix bugs or polish existing behavior.
 
 ## Unreleased
+
+- Migrated the gallery and settings launcher from legacy Application classes to Foundry ApplicationV2.
+- Moved the prototype token appearance dialog markup into a Handlebars template and compacted the image browse button.
 
 ## 0.2.0
 

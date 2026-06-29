@@ -178,28 +178,50 @@ class MKActorsApi {
   }
 }
 
-class MKActorsApp extends Application {
+class MKActorsApp extends foundry.applications.api.ApplicationV2 {
+  static DEFAULT_OPTIONS = {
+    id: "mk-actors-app",
+    classes: ["mk-actors-app"],
+    position: {
+      width: 980,
+      height: 720
+    },
+    window: {
+      title: "MKACTORS.AppTitle",
+      resizable: true
+    }
+  };
+
   constructor(options = {}) {
     super(options);
     this.cache = null;
     this.warnings = [];
-    this.state = {
+    this.filters = {
       search: "",
       type: "",
       source: ""
     };
   }
 
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      id: "mk-actors-app",
-      title: game.i18n.localize("MKACTORS.AppTitle"),
-      template: `modules/${MODULE_ID}/templates/gallery.hbs`,
-      width: 980,
-      height: 720,
-      resizable: true,
-      classes: ["mk-actors-app"]
-    });
+  get title() {
+    return game.i18n.localize("MKACTORS.AppTitle");
+  }
+
+  async _prepareContext(options = {}) {
+    return this.getData(options);
+  }
+
+  async _renderHTML(context, _options) {
+    return renderTemplate(`modules/${MODULE_ID}/templates/gallery.hbs`, context);
+  }
+
+  _replaceHTML(result, content, _options) {
+    content.innerHTML = result;
+  }
+
+  _onRender(context, options) {
+    super._onRender(context, options);
+    this.activateListeners(this.element);
   }
 
   invalidateCache() {
@@ -209,7 +231,7 @@ class MKActorsApp extends Application {
   }
 
   async getData(_options = {}) {
-    debugLog("Preparing gallery data", { state: { ...this.state } });
+    debugLog("Preparing gallery data", { state: { ...this.filters } });
     const allActors = await this.getActorEntries();
     const filteredByControls = this.filterByControls(allActors);
     const types = this.getTypeOptions(allActors);
@@ -228,7 +250,7 @@ class MKActorsApp extends Application {
       hasActors: filteredByControls.length > 0,
       types,
       sources,
-      state: this.state,
+      state: this.filters,
       cardSize,
       canSpawn: game.user?.isGM,
       warnings: this.warnings
@@ -236,32 +258,31 @@ class MKActorsApp extends Application {
   }
 
   activateListeners(html) {
-    super.activateListeners(html);
     const root = html?.[0] || html;
     debugLog("Activating gallery listeners");
 
     root.querySelector?.("[data-action='search']")?.addEventListener("input", (event) => {
-      this.state.search = event.currentTarget.value || "";
-      debugLog("Search filter changed", { search: this.state.search });
+      this.filters.search = event.currentTarget.value || "";
+      debugLog("Search filter changed", { search: this.filters.search });
       this.applySearchFilter(root);
     });
 
     root.querySelector?.("[data-action='type']")?.addEventListener("change", (event) => {
-      this.state.type = event.currentTarget.value || "";
-      debugLog("Type filter changed", { type: this.state.type });
+      this.filters.type = event.currentTarget.value || "";
+      debugLog("Type filter changed", { type: this.filters.type });
       this.render(false);
     });
 
     root.querySelector?.("[data-action='source']")?.addEventListener("change", (event) => {
-      this.state.source = event.currentTarget.value || "";
-      debugLog("Source filter changed", { source: this.state.source });
+      this.filters.source = event.currentTarget.value || "";
+      debugLog("Source filter changed", { source: this.filters.source });
       this.render(false);
     });
 
     root.querySelector?.("[data-action='clear']")?.addEventListener("click", () => {
-      this.state.search = "";
-      this.state.type = "";
-      this.state.source = "";
+      this.filters.search = "";
+      this.filters.type = "";
+      this.filters.source = "";
       debugLog("Gallery filters cleared");
       this.render(false);
     });
@@ -408,8 +429,8 @@ class MKActorsApp extends Application {
 
   filterByControls(entries) {
     return entries.filter((entry) => {
-      if (this.state.type && entry.type !== this.state.type) return false;
-      if (this.state.source && entry.sourceId !== this.state.source) return false;
+      if (this.filters.type && entry.type !== this.filters.type) return false;
+      if (this.filters.source && entry.sourceId !== this.filters.source) return false;
       return true;
     });
   }
@@ -422,12 +443,12 @@ class MKActorsApp extends Application {
       {
         value: "",
         label: game.i18n.localize("MKACTORS.AllTypes"),
-        selected: this.state.type === ""
+        selected: this.filters.type === ""
       },
       ...typeValues.map((type) => ({
         value: type,
         label: MKActorsApi.titleCase(type),
-        selected: this.state.type === type
+        selected: this.filters.type === type
       }))
     ];
   }
@@ -440,11 +461,11 @@ class MKActorsApp extends Application {
       {
         value: "",
         label: game.i18n.localize("MKACTORS.AllSources"),
-        selected: this.state.source === ""
+        selected: this.filters.source === ""
       },
       ...Array.from(sources.entries())
         .sort((a, b) => a[1].localeCompare(b[1], game.i18n.lang))
-        .map(([value, label]) => ({ value, label, selected: this.state.source === value }))
+        .map(([value, label]) => ({ value, label, selected: this.filters.source === value }))
     ];
   }
 
@@ -456,7 +477,7 @@ class MKActorsApp extends Application {
   }
 
   applySearchFilter(root) {
-    const query = String(this.state.search || "").trim().toLowerCase();
+    const query = String(this.filters.search || "").trim().toLowerCase();
     let visible = 0;
 
     for (const card of root.querySelectorAll?.(".mk-actors__card") || []) {
@@ -503,7 +524,7 @@ class MKActorsApp extends Application {
       return;
     }
 
-    openTokenPortraitDialog(actor);
+    await openTokenPortraitDialog(actor);
   }
 
   async onCardDoubleClick(event) {
@@ -594,7 +615,7 @@ class MKActorsApp extends Application {
   }
 }
 
-class MKActorsOpenGalleryMenu extends FormApplication {
+class MKActorsOpenGalleryMenu extends foundry.applications.api.ApplicationV2 {
   render(_force, _options = {}) {
     debugLog("Settings menu launcher opened");
     MKActorsApi.open();
@@ -771,7 +792,7 @@ function numberOrFallback(value, fallback) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function openTokenPortraitDialog(actor) {
+async function openTokenPortraitDialog(actor) {
   const prototypeToken = actor.prototypeToken;
   const portraitImage = actor.img ?? "";
   const width = prototypeToken?.width ?? 1;
@@ -787,9 +808,36 @@ function openTokenPortraitDialog(actor) {
     { value: "fill", label: localize("FitFill") },
     { value: "height", label: localize("FitHeight") },
     { value: "width", label: localize("FitWidth") }
-  ].map((option) => `
-      <option value="${option.value}" ${option.value === fit ? "selected" : ""}>${option.label}</option>
-    `).join("");
+  ].map((option) => ({
+    ...option,
+    selected: option.value === fit
+  }));
+
+  const content = await renderTemplate(`modules/${MODULE_ID}/templates/token-portrait-dialog.hbs`, {
+    portraitImage,
+    width,
+    height,
+    fitOptions,
+    anchorX,
+    anchorY,
+    scale,
+    labels: {
+      imagePath: localize("ImagePath"),
+      browseImage: localize("BrowseImage"),
+      imagePathPortraitNote: localize("ImagePathPortraitNote"),
+      dimensionsGridSpaces: localize("DimensionsGridSpaces"),
+      width: localize("Width"),
+      height: localize("Height"),
+      fitModeHeightNote: localize("FitModeHeightNote"),
+      imageFitMode: localize("ImageFitMode"),
+      imageFitModeHint: localize("ImageFitModeHint"),
+      anchor: localize("Anchor"),
+      x: localize("X"),
+      y: localize("Y"),
+      anchorHint: localize("AnchorHint"),
+      scaleRatio: localize("ScaleRatio")
+    }
+  });
 
   debugLog("Opening token portrait dialog", {
     actorId: actor.id,
@@ -807,62 +855,7 @@ function openTokenPortraitDialog(actor) {
 
   new Dialog({
     title: `${localize("TokenPortraitDialogTitle")}: ${actorName}`,
-    content: `
-<form class="mk-actors-token-editor">
-  <div class="form-group">
-    <label>${localize("ImagePath")}</label>
-    <div class="mk-actors-token-editor__row">
-      <input id="mk-portrait-img" type="text" value="${escapeHtml(portraitImage)}">
-      <button type="button" id="mk-browse-portrait" title="${localize("BrowseImage")}"><i class="fas fa-folder-open"></i></button>
-    </div>
-    <p class="notes">${localize("ImagePathPortraitNote")}</p>
-  </div>
-
-  <div class="form-group">
-    <label>${localize("DimensionsGridSpaces")}</label>
-    <div class="mk-actors-token-editor__dimensions">
-      <label>
-        <span>${localize("Width")}</span>
-        <input id="mk-token-width" type="number" step="0.5" value="${escapeHtml(width)}">
-      </label>
-      <label>
-        <span>${localize("Height")}</span>
-        <input id="mk-token-height" type="number" step="0.5" value="${escapeHtml(height)}">
-      </label>
-    </div>
-    <p class="notes">${localize("FitModeHeightNote")}</p>
-  </div>
-
-  <div class="form-group">
-    <label>${localize("ImageFitMode")}</label>
-    <select id="mk-token-fit">${fitOptions}</select>
-    <p class="notes">${localize("ImageFitModeHint")}</p>
-  </div>
-
-  <div class="form-group">
-    <label>${localize("Anchor")}</label>
-    <div class="mk-actors-token-editor__dimensions">
-      <label>
-        <span>${localize("X")}</span>
-        <input id="mk-token-anchor-x" type="number" step="0.1" value="${escapeHtml(anchorX)}">
-      </label>
-      <label>
-        <span>${localize("Y")}</span>
-        <input id="mk-token-anchor-y" type="number" step="0.1" value="${escapeHtml(anchorY)}">
-      </label>
-    </div>
-    <p class="notes">${localize("AnchorHint")}</p>
-  </div>
-
-  <div class="form-group">
-    <label>${localize("ScaleRatio")}</label>
-    <div class="mk-actors-token-editor__scale">
-      <input id="mk-token-scale-range" type="range" min="0.2" max="3" step="0.05" value="${escapeHtml(scale)}">
-      <input id="mk-token-scale" type="number" min="0.2" step="0.05" value="${escapeHtml(scale)}">
-    </div>
-  </div>
-</form>
-    `,
+    content,
     buttons: {
       apply: {
         icon: '<i class="fas fa-check"></i>',

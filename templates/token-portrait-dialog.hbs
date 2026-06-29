@@ -1,0 +1,60 @@
+<form class="mk-actors-token-editor">
+  <div class="form-group">
+    <label>{{labels.imagePath}}</label>
+    <div class="mk-actors-token-editor__row">
+      <input id="mk-portrait-img" type="text" value="{{portraitImage}}">
+      <button type="button" id="mk-browse-portrait" class="mk-actors-token-editor__browse" title="{{labels.browseImage}}">
+        <i class="fas fa-folder-open"></i>
+      </button>
+    </div>
+    <p class="notes">{{labels.imagePathPortraitNote}}</p>
+  </div>
+
+  <div class="form-group">
+    <label>{{labels.dimensionsGridSpaces}}</label>
+    <div class="mk-actors-token-editor__dimensions">
+      <label>
+        <span>{{labels.width}}</span>
+        <input id="mk-token-width" type="number" step="0.5" value="{{width}}">
+      </label>
+      <label>
+        <span>{{labels.height}}</span>
+        <input id="mk-token-height" type="number" step="0.5" value="{{height}}">
+      </label>
+    </div>
+    <p class="notes">{{labels.fitModeHeightNote}}</p>
+  </div>
+
+  <div class="form-group">
+    <label>{{labels.imageFitMode}}</label>
+    <select id="mk-token-fit">
+      {{#each fitOptions}}
+        <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+      {{/each}}
+    </select>
+    <p class="notes">{{labels.imageFitModeHint}}</p>
+  </div>
+
+  <div class="form-group">
+    <label>{{labels.anchor}}</label>
+    <div class="mk-actors-token-editor__dimensions">
+      <label>
+        <span>{{labels.x}}</span>
+        <input id="mk-token-anchor-x" type="number" step="0.1" value="{{anchorX}}">
+      </label>
+      <label>
+        <span>{{labels.y}}</span>
+        <input id="mk-token-anchor-y" type="number" step="0.1" value="{{anchorY}}">
+      </label>
+    </div>
+    <p class="notes">{{labels.anchorHint}}</p>
+  </div>
+
+  <div class="form-group">
+    <label>{{labels.scaleRatio}}</label>
+    <div class="mk-actors-token-editor__scale">
+      <input id="mk-token-scale-range" type="range" min="0.2" max="3" step="0.05" value="{{scale}}">
+      <input id="mk-token-scale" type="number" min="0.2" step="0.05" value="{{scale}}">
+    </div>
+  </div>
+</form>

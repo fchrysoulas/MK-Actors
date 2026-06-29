@@ -53,6 +53,9 @@ templates/gallery.hbs    Handlebars application template
 - Avoid broad refactors unless they are needed for the requested change.
 - Keep comments concise and only where they clarify non-obvious Foundry behavior.
 
+## Foundry VTT Dev
+https://foundryvtt.wiki/en/development/getting-started-with-development
+
 ## UI And Styling
 
 - The app is a Foundry `Application` using `templates/gallery.hbs`.
@@ -90,3 +93,13 @@ When preparing a release:
 - Keep `compatibility.minimum` and `compatibility.verified` accurate.
 - Fill in `url`, `manifest`, and `download` only when real release URLs exist.
 - Do not invent hosting or package URLs.
+
+# Changelog
+
+All notable changes to MK Actors will be documented in this file.
+
+This project follows semantic versioning where practical:
+
+- `MAJOR` versions may include breaking compatibility or workflow changes.
+- `MINOR` versions add backwards-compatible features.
+- `PATCH` versions fix bugs or polish existing behavior.
