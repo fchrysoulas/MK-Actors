@@ -1,6 +1,6 @@
 # MK Actors
 
-A system-agnostic Foundry VTT module for v12-v13 that gives the GM a searchable visual gallery of Actor documents. You can drag an Actor card onto the active Scene to create a token, or use the crosshair button to spawn it near the current canvas view center.
+A system-agnostic Foundry VTT module for v12-v13 that gives the GM a searchable visual gallery of Actor documents. You can drag an Actor card onto the active Scene to create a token.
 
 ## Compatibility
 
@@ -23,7 +23,6 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Double-click an Actor card to open its sheet.
 - Right-click an Actor portrait to open a context menu for editing portrait image, token dimensions, fit mode, anchor, and scale.
 - Open an Actor sheet from the gallery.
-- GM-only action to spawn an Actor near the current canvas view center.
 - Configurable included and excluded Actor type IDs.
 - Client-side card size setting.
 - Client-side debug mode for tracing module actions in the browser console.
@@ -92,10 +91,9 @@ Then restart Foundry, enable **MK Actors** in your world, and open the gallery.
 ## Notes
 
 - Dragging a compendium Actor onto a Scene follows Foundry's normal Actor drop behavior.
-- The **Spawn at View Center** button imports a compendium Actor into the world first, because placed tokens need a world Actor reference.
 - Right-clicking a gallery portrait opens a context menu with a prototype token appearance editor for that Actor. The editor sets the Actor portrait image path, token width, token height, token texture fit mode, anchor, and scale. The prototype token image path is synced from the portrait image automatically.
 - The **Sync portrait to token image** setting updates an Actor's prototype token image when that Actor's portrait image changes. It does not rewrite existing Actors until their portraits are changed, and it does not update tokens already placed on Scenes.
-- Enable **Debug mode** in the module settings to log MK Actors settings changes, UI actions, Actor resolution, token spawn calls, and portrait sync hooks to the browser console with the `MK Actors |` prefix.
+- Enable **Debug mode** in the module settings to log MK Actors settings changes, UI actions, Actor resolution, drag actions, and portrait sync hooks to the browser console with the `MK Actors |` prefix.
 - The module is intentionally conservative: it avoids system-specific stats, CR fields, levels, or NPC sheet assumptions.
 
 ## File structure
@@ -107,9 +105,19 @@ mk-actors/
   module.json
   README.md
   lang/en.json
+  scripts/actor-helpers.js
+  scripts/api.js
+  scripts/constants.js
+  scripts/debug.js
+  scripts/documents.js
+  scripts/gallery-app.js
+  scripts/hooks.js
   scripts/main.js
+  scripts/settings.js
+  scripts/token-portrait-dialog.js
   styles/gallery.css
   templates/gallery.hbs
+  templates/token-portrait-dialog.hbs
 ```
 
 ## Version history

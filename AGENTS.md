@@ -4,7 +4,7 @@ Shared instructions for AI agents working on this repository.
 
 ## Project
 
-MK Actors is a system-agnostic Foundry VTT module for Foundry v12-v13. It provides a searchable visual gallery of Foundry `Actor` documents from the world and visible Actor compendiums. Users can drag Actor cards onto the active Scene or, as a GM, spawn an Actor token at the Scene center.
+MK Actors is a system-agnostic Foundry VTT module for Foundry v12-v13. It provides a searchable visual gallery of Foundry `Actor` documents from the world and visible Actor compendiums. Users can drag Actor cards onto the active Scene using Foundry's standard Actor drag data.
 
 Keep the module independent of any specific game system. Do not add assumptions for Shadowdark, D&D5e, PF2e, or any other system unless the requested change explicitly introduces optional system-specific behavior.
 
@@ -15,9 +15,19 @@ module.json              Foundry module manifest
 README.md                User-facing documentation
 CHANGELOG.md             Release notes and version history
 lang/en.json             English localization strings
-scripts/main.js          Module logic and Foundry hook registration
+scripts/actor-helpers.js Actor display and filtering helpers
+scripts/api.js           Public module API
+scripts/constants.js     Shared constants
+scripts/debug.js         Debug logging helpers
+scripts/documents.js     Foundry document resolution helpers
+scripts/gallery-app.js   ApplicationV2 gallery implementation
+scripts/hooks.js         Foundry hook callbacks
+scripts/main.js          Module entry point and hook registration
+scripts/settings.js      Settings and keybinding registration
+scripts/token-portrait-dialog.js Prototype token appearance dialog logic
 styles/gallery.css       Application styling
 templates/gallery.hbs    Handlebars application template
+templates/token-portrait-dialog.hbs Prototype token appearance dialog template
 ```
 
 ## Foundry Compatibility
@@ -30,7 +40,7 @@ templates/gallery.hbs    Handlebars application template
 { type: "Actor", uuid: "..." }
 ```
 
-- Use Foundry document APIs such as `fromUuid`, `Actor.create`, `actor.getTokenDocument`, and `canvas.scene.createEmbeddedDocuments` where appropriate.
+- Use Foundry document APIs such as `fromUuid` where appropriate.
 - Avoid relying on private Foundry internals unless there is already a fallback path and a clear reason.
 
 ## Design Principles
@@ -39,14 +49,14 @@ templates/gallery.hbs    Handlebars application template
 - The module must remain system agnostic.
 - Actor type filtering should use raw type IDs such as `npc`, `monster`, `creature`, `character`, or `pc`.
 - Default behavior should include all Actor types except common player-character type IDs.
-- Compendium Actors must be imported to a world Actor before direct token creation.
-- Non-GM users may browse and drag when permissions allow it, but direct spawn actions must stay GM-gated.
+- Actor placement is handled by Foundry's normal drag-and-drop workflow, not by direct token creation helpers.
+- Non-GM users may browse and drag when permissions allow it.
 
 ## Coding Style
 
-- Use plain JavaScript modules loaded through `module.json` `esmodules`.
-- Keep constants such as `MODULE_ID` and fallback asset paths near the top of `scripts/main.js`.
-- Prefer small static helpers on `MKActorsApi` for reusable Foundry-facing behavior.
+- Use plain JavaScript modules imported from `scripts/main.js`.
+- Keep constants such as `MODULE_ID` and fallback asset paths in `scripts/constants.js`.
+- Keep `MKActorsApi` focused on public module actions such as opening, refreshing, and resolving Actors.
 - Keep UI state inside `MKActorsApp`.
 - Use `game.i18n.localize` for user-facing text from JavaScript.
 - Add or update `lang/en.json` keys whenever visible UI text changes.
@@ -58,7 +68,7 @@ https://foundryvtt.wiki/en/development/getting-started-with-development
 
 ## UI And Styling
 
-- The app is a Foundry `Application` using `templates/gallery.hbs`.
+- The app is a Foundry `ApplicationV2` using `templates/gallery.hbs`.
 - Keep CSS scoped under `.mk-actors` or `.mk-actors-app` where possible.
 - Preserve draggable Actor cards and icon-only action buttons with meaningful `title` attributes.
 - Maintain responsive behavior for narrow Foundry windows.
@@ -76,7 +86,6 @@ There is no automated test suite in this repository at the moment. For code chan
    - Search, type filter, source filter, clear, and refresh work.
    - Actor cards drag onto a Scene.
    - Open Sheet resolves both world and compendium Actors.
-   - Spawn at Scene Center works for a GM and warns non-GM users.
 
 If Foundry is not available, state that manual in-Foundry verification was not run.
 

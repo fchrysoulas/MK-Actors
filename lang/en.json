@@ -62,8 +62,5 @@
   "MKACTORS.World": "World",
   "MKACTORS.Compendium": "Compendium",
   "MKACTORS.LoadingFailed": "MK Actors | Failed to load some Actor sources. Check the console for details.",
-  "MKACTORS.CannotResolveActor": "MK Actors | Could not resolve that Actor.",
-  "MKACTORS.SceneRequired": "MK Actors | Open a Scene before spawning an Actor.",
-  "MKACTORS.GMRequired": "MK Actors | You need GM permissions to spawn Actors directly. Drag-and-drop may still work if your permissions allow it.",
-  "MKACTORS.SpawnCenter": "Spawn at View Center"
+  "MKACTORS.CannotResolveActor": "MK Actors | Could not resolve that Actor."
 }

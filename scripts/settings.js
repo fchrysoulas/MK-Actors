@@ -1,0 +1,136 @@
+import { MODULE_ID } from "./constants.js";
+import { debugLog } from "./debug.js";
+import { MKActorsApi } from "./api.js";
+
+class MKActorsOpenGalleryMenu extends foundry.applications.api.ApplicationV2 {
+  render(_force, _options = {}) {
+    debugLog("Settings menu launcher opened");
+    MKActorsApi.open();
+    return this;
+  }
+}
+
+function refreshAfterSettingChange(setting, value) {
+  debugLog("Setting changed", { setting, value });
+  MKActorsApi.refresh();
+}
+
+export function registerSettings() {
+  game.settings.register(MODULE_ID, "includeWorldActors", {
+    name: game.i18n.localize("MKACTORS.IncludeWorldActors"),
+    hint: game.i18n.localize("MKACTORS.IncludeWorldActorsHint"),
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: (value) => refreshAfterSettingChange("includeWorldActors", value)
+  });
+
+  game.settings.register(MODULE_ID, "includeCompendiumActors", {
+    name: game.i18n.localize("MKACTORS.IncludeCompendiumActors"),
+    hint: game.i18n.localize("MKACTORS.IncludeCompendiumActorsHint"),
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: (value) => refreshAfterSettingChange("includeCompendiumActors", value)
+  });
+
+  game.settings.register(MODULE_ID, "actorTypes", {
+    name: game.i18n.localize("MKACTORS.ActorTypes"),
+    hint: game.i18n.localize("MKACTORS.ActorTypesHint"),
+    scope: "world",
+    config: true,
+    type: String,
+    default: "",
+    onChange: (value) => refreshAfterSettingChange("actorTypes", value)
+  });
+
+  game.settings.register(MODULE_ID, "excludedActorTypes", {
+    name: game.i18n.localize("MKACTORS.ExcludedActorTypes"),
+    hint: game.i18n.localize("MKACTORS.ExcludedActorTypesHint"),
+    scope: "world",
+    config: true,
+    type: String,
+    default: "character,pc,player",
+    onChange: (value) => refreshAfterSettingChange("excludedActorTypes", value)
+  });
+
+  game.settings.register(MODULE_ID, "showOnlyVisiblePacks", {
+    name: game.i18n.localize("MKACTORS.ShowOnlyVisiblePacks"),
+    hint: game.i18n.localize("MKACTORS.ShowOnlyVisiblePacksHint"),
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: (value) => refreshAfterSettingChange("showOnlyVisiblePacks", value)
+  });
+
+  game.settings.register(MODULE_ID, "cardSize", {
+    name: game.i18n.localize("MKACTORS.CardSize"),
+    hint: game.i18n.localize("MKACTORS.CardSizeHint"),
+    scope: "client",
+    config: true,
+    type: Number,
+    default: 150,
+    range: {
+      min: 120,
+      max: 260,
+      step: 10
+    },
+    onChange: (value) => refreshAfterSettingChange("cardSize", value)
+  });
+
+  game.settings.register(MODULE_ID, "syncPortraitToTokenImage", {
+    name: game.i18n.localize("MKACTORS.SyncPortraitToTokenImage"),
+    hint: game.i18n.localize("MKACTORS.SyncPortraitToTokenImageHint"),
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: (value) => debugLog("Setting changed", { setting: "syncPortraitToTokenImage", value })
+  });
+
+  game.settings.register(MODULE_ID, "debugMode", {
+    name: game.i18n.localize("MKACTORS.DebugMode"),
+    hint: game.i18n.localize("MKACTORS.DebugModeHint"),
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: (value) => debugLog("Debug mode changed", { enabled: value })
+  });
+
+  game.settings.registerMenu(MODULE_ID, "openGallery", {
+    name: game.i18n.localize("MKACTORS.Open"),
+    label: game.i18n.localize("MKACTORS.Open"),
+    hint: game.i18n.localize("MKACTORS.OpenHint"),
+    icon: "fas fa-users-viewfinder",
+    type: MKActorsOpenGalleryMenu,
+    restricted: false
+  });
+  debugLog("Settings registered");
+}
+
+export function registerKeybinding() {
+  if (!game.keybindings) return;
+
+  game.keybindings.register(MODULE_ID, "openGallery", {
+    name: game.i18n.localize("MKACTORS.Open"),
+    hint: game.i18n.localize("MKACTORS.OpenHint"),
+    editable: [
+      {
+        key: "KeyG",
+        modifiers: ["CONTROL", "SHIFT"]
+      }
+    ],
+    onDown: () => {
+      debugLog("Open gallery keybinding pressed");
+      MKActorsApi.open();
+      return true;
+    },
+    restricted: false,
+    precedence: CONST.KEYBINDING_PRECEDENCE?.NORMAL ?? 0
+  });
+  debugLog("Keybinding registered", { id: "openGallery" });
+}
