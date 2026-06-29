@@ -5,15 +5,19 @@ class MKActorsApi {
   static app = null;
 
   static open() {
+    debugLog("Opening gallery");
     if (!this.app) this.app = new MKActorsApp();
     this.app.render(true);
+    debugLog("Gallery render requested", { appId: this.app.appId });
     return this.app;
   }
 
   static refresh() {
+    debugLog("Refreshing gallery");
     if (!this.app) return this.open();
     this.app.invalidateCache();
     this.app.render(true);
+    debugLog("Gallery cache invalidated and render requested", { appId: this.app.appId });
     return this.app;
   }
 
@@ -91,36 +95,55 @@ class MKActorsApi {
   }
 
   static async resolveActor(uuid) {
+    debugLog("Resolving Actor", { uuid });
     const document = await fromUuid(uuid);
-    if (!document) return null;
-    if (document.documentName === "Actor") return document;
-    if (document.constructor?.documentName === "Actor") return document;
+    if (!document) {
+      debugLog("Actor resolution failed", { uuid });
+      return null;
+    }
+    if (document.documentName === "Actor" || document.constructor?.documentName === "Actor") {
+      debugLog("Actor resolved", {
+        uuid,
+        id: document.id,
+        name: document.name,
+        pack: document.pack || ""
+      });
+      return document;
+    }
+    debugLog("Resolved document was not an Actor", { uuid, documentName: document.documentName });
     return null;
   }
 
   static async spawnAtViewCenter(uuid) {
+    debugLog("Spawn requested", { uuid });
     if (!game.user?.isGM) {
+      debugLog("Spawn blocked: current user is not GM", { uuid, userId: game.user?.id });
       ui.notifications.warn(game.i18n.localize("MKACTORS.GMRequired"));
       return null;
     }
 
     if (!canvas?.scene) {
+      debugLog("Spawn blocked: no active Scene", { uuid });
       ui.notifications.warn(game.i18n.localize("MKACTORS.SceneRequired"));
       return null;
     }
 
     let actor = await this.resolveActor(uuid);
     if (!actor) {
+      debugLog("Spawn blocked: Actor could not be resolved", { uuid });
       ui.notifications.warn(game.i18n.localize("MKACTORS.CannotResolveActor"));
       return null;
     }
 
     // Tokens need a world Actor. If this is a compendium Actor, import a world copy first.
     if (actor.pack) {
+      debugLog("Importing compendium Actor before spawn", { uuid, pack: actor.pack, name: actor.name });
       actor = await Actor.create(actor.toObject(), { renderSheet: false });
+      debugLog("Compendium Actor imported", { id: actor.id, uuid: actor.uuid, name: actor.name });
     }
 
     const position = this.getViewCenterPosition();
+    debugLog("Spawn position calculated", { uuid: actor.uuid, position });
     let tokenData;
 
     if (actor.getTokenDocument) {
@@ -137,7 +160,17 @@ class MKActorsApi {
       });
     }
 
-    return canvas.scene.createEmbeddedDocuments("Token", [tokenData]);
+    debugLog("Creating Token document", {
+      actorId: actor.id,
+      actorName: actor.name,
+      sceneId: canvas.scene.id,
+      x: tokenData?.x,
+      y: tokenData?.y
+    });
+
+    const created = await canvas.scene.createEmbeddedDocuments("Token", [tokenData]);
+    debugLog("Token document created", { actorId: actor.id, count: created?.length || 0 });
+    return created;
   }
 
   static async spawnAtSceneCenter(uuid) {
@@ -170,16 +203,25 @@ class MKActorsApp extends Application {
   }
 
   invalidateCache() {
+    debugLog("Invalidating gallery cache");
     this.cache = null;
     this.warnings = [];
   }
 
   async getData(_options = {}) {
+    debugLog("Preparing gallery data", { state: { ...this.state } });
     const allActors = await this.getActorEntries();
     const filteredByControls = this.filterByControls(allActors);
     const types = this.getTypeOptions(allActors);
     const sources = this.getSourceOptions(allActors);
     const cardSize = Number(game.settings.get(MODULE_ID, "cardSize")) || 150;
+    debugLog("Gallery data prepared", {
+      totalActors: allActors.length,
+      visibleActors: filteredByControls.length,
+      types: types.length,
+      sources: sources.length,
+      cardSize
+    });
 
     return {
       actors: filteredByControls,
@@ -196,19 +238,23 @@ class MKActorsApp extends Application {
   activateListeners(html) {
     super.activateListeners(html);
     const root = html?.[0] || html;
+    debugLog("Activating gallery listeners");
 
     root.querySelector?.("[data-action='search']")?.addEventListener("input", (event) => {
       this.state.search = event.currentTarget.value || "";
+      debugLog("Search filter changed", { search: this.state.search });
       this.applySearchFilter(root);
     });
 
     root.querySelector?.("[data-action='type']")?.addEventListener("change", (event) => {
       this.state.type = event.currentTarget.value || "";
+      debugLog("Type filter changed", { type: this.state.type });
       this.render(false);
     });
 
     root.querySelector?.("[data-action='source']")?.addEventListener("change", (event) => {
       this.state.source = event.currentTarget.value || "";
+      debugLog("Source filter changed", { source: this.state.source });
       this.render(false);
     });
 
@@ -216,10 +262,12 @@ class MKActorsApp extends Application {
       this.state.search = "";
       this.state.type = "";
       this.state.source = "";
+      debugLog("Gallery filters cleared");
       this.render(false);
     });
 
     root.querySelector?.("[data-action='refresh']")?.addEventListener("click", () => {
+      debugLog("Manual gallery refresh requested");
       this.invalidateCache();
       this.render(false);
     });
@@ -227,6 +275,10 @@ class MKActorsApp extends Application {
     for (const card of root.querySelectorAll?.("[data-action='drag-actor']") || []) {
       card.addEventListener("dragstart", this.onDragStart.bind(this));
       card.addEventListener("dblclick", this.onCardDoubleClick.bind(this));
+    }
+
+    for (const portrait of root.querySelectorAll?.("[data-action='edit-token-portrait']") || []) {
+      portrait.addEventListener("contextmenu", this.onPortraitContextMenu.bind(this));
     }
 
     for (const button of root.querySelectorAll?.("[data-action='open-sheet']") || []) {
@@ -241,10 +293,17 @@ class MKActorsApp extends Application {
   }
 
   async getActorEntries() {
-    if (this.cache) return this.cache;
+    if (this.cache) {
+      debugLog("Using cached Actor entries", { count: this.cache.length });
+      return this.cache;
+    }
 
     const entries = [];
     this.warnings = [];
+    debugLog("Loading Actor entries", {
+      includeWorldActors: game.settings.get(MODULE_ID, "includeWorldActors"),
+      includeCompendiumActors: game.settings.get(MODULE_ID, "includeCompendiumActors")
+    });
 
     if (game.settings.get(MODULE_ID, "includeWorldActors")) {
       entries.push(...this.getWorldActorEntries());
@@ -264,13 +323,21 @@ class MKActorsApp extends Application {
     if (this.warnings.length) {
       ui.notifications.warn(game.i18n.localize("MKACTORS.LoadingFailed"));
       console.warn(game.i18n.localize("MKACTORS.SourceWarningsConsole"), this.warnings);
+      debugLog("Actor source warnings recorded", { warnings: this.warnings });
     }
+
+    debugLog("Actor entries loaded", {
+      beforeTypeFilter: entries.length,
+      afterTypeFilter: this.cache.length,
+      includeTypes,
+      excludeTypes
+    });
 
     return this.cache;
   }
 
   getWorldActorEntries() {
-    return game.actors.contents
+    const entries = game.actors.contents
       .filter((actor) => MKActorsApi.canViewActor(actor))
       .map((actor) => {
         const type = String(actor.type || "");
@@ -289,6 +356,8 @@ class MKActorsApp extends Application {
           searchText: this.buildSearchText(actor.name, type, sourceLabel)
         };
       });
+    debugLog("World Actor entries loaded", { count: entries.length });
+    return entries;
   }
 
   async getCompendiumActorEntries() {
@@ -301,7 +370,8 @@ class MKActorsApp extends Application {
       if (onlyVisiblePacks && pack.visible === false) continue;
 
       try {
-        const index = await pack.getIndex({ fields: ["img", "type", "folder"] });
+        const index = await pack.getIndex({ fields: ["img", "type", "folder", "prototypeToken.texture.src"] });
+        debugLog("Compendium Actor index loaded", { pack: pack.collection, count: index.size ?? index.length ?? 0 });
         for (const entry of index) {
           const type = String(entry.type || "");
           const sourceLabel = pack.metadata?.label || pack.title || pack.collection;
@@ -320,10 +390,12 @@ class MKActorsApp extends Application {
           });
         }
       } catch (err) {
+        debugLog("Compendium Actor index failed", { pack: pack.collection, error: err });
         this.warnings.push({ pack: pack.collection, error: err });
       }
     }
 
+    debugLog("Compendium Actor entries loaded", { count: entries.length, onlyVisiblePacks });
     return entries;
   }
 
@@ -395,6 +467,7 @@ class MKActorsApp extends Application {
 
     const count = root.querySelector?.("[data-role='result-count']");
     if (count) count.textContent = String(visible);
+    debugLog("Search filter applied", { search: query, visible });
   }
 
   onDragStart(event) {
@@ -405,16 +478,32 @@ class MKActorsApp extends Application {
     event.dataTransfer.setData("text/plain", serialized);
     event.dataTransfer.setData("application/json", serialized);
     event.dataTransfer.effectAllowed = "copy";
+    debugLog("Actor drag started", { uuid });
   }
 
   async openActorSheet(uuid) {
+    debugLog("Actor sheet open requested", { uuid });
     const actor = await MKActorsApi.resolveActor(uuid);
     if (!actor) {
+      debugLog("Actor sheet open blocked: Actor could not be resolved", { uuid });
       ui.notifications.warn(game.i18n.localize("MKACTORS.CannotResolveActor"));
       return;
     }
 
     actor.sheet?.render(true);
+    debugLog("Actor sheet render requested", { uuid: actor.uuid, name: actor.name });
+  }
+
+  async openTokenPortraitEditor(uuid) {
+    debugLog("Token portrait editor requested", { uuid });
+    const actor = await MKActorsApi.resolveActor(uuid);
+    if (!actor) {
+      debugLog("Token portrait editor blocked: Actor could not be resolved", { uuid });
+      ui.notifications.warn(game.i18n.localize("MKACTORS.CannotResolveActor"));
+      return;
+    }
+
+    openTokenPortraitDialog(actor);
   }
 
   async onCardDoubleClick(event) {
@@ -422,14 +511,76 @@ class MKActorsApp extends Application {
 
     event.preventDefault();
     event.stopPropagation();
+    debugLog("Actor card double-clicked", { uuid: event.currentTarget.dataset.uuid });
 
     await this.openActorSheet(event.currentTarget.dataset.uuid);
+  }
+
+  async onPortraitContextMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const card = event.currentTarget.closest?.("[data-uuid]");
+    debugLog("Portrait context menu requested", { uuid: card?.dataset.uuid });
+    this.openPortraitContextMenu(event, card?.dataset.uuid);
+  }
+
+  openPortraitContextMenu(event, uuid) {
+    if (!uuid) return;
+
+    closePortraitContextMenu();
+    debugLog("Opening portrait context menu", { uuid, x: event.clientX, y: event.clientY });
+
+    const menu = document.createElement("nav");
+    menu.className = "mk-actors-context-menu";
+    menu.innerHTML = `
+      <button type="button">
+        <i class="fas fa-image"></i>
+        <span>${localize("EditTokenPortrait")}</span>
+      </button>
+    `;
+
+    const close = () => {
+      menu.remove();
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+      if (activePortraitContextMenu?.menu === menu) activePortraitContextMenu = null;
+    };
+
+    const onPointerDown = (pointerEvent) => {
+      if (!menu.contains(pointerEvent.target)) close();
+    };
+
+    const onKeyDown = (keyEvent) => {
+      if (keyEvent.key === "Escape") close();
+    };
+
+    menu.querySelector("button")?.addEventListener("click", async () => {
+      close();
+      debugLog("Portrait context menu action selected", { uuid, action: "edit-token-portrait" });
+      await this.openTokenPortraitEditor(uuid);
+    });
+
+    activePortraitContextMenu = { menu, close };
+    document.body.appendChild(menu);
+
+    const rect = menu.getBoundingClientRect();
+    const left = Math.min(event.clientX, window.innerWidth - rect.width - 8);
+    const top = Math.min(event.clientY, window.innerHeight - rect.height - 8);
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${Math.max(8, top)}px`;
+
+    setTimeout(() => {
+      document.addEventListener("mousedown", onPointerDown);
+      document.addEventListener("keydown", onKeyDown);
+    }, 0);
   }
 
   async onOpenSheet(event) {
     event.preventDefault();
     event.stopPropagation();
 
+    debugLog("Open sheet button clicked", { uuid: event.currentTarget.dataset.uuid });
     await this.openActorSheet(event.currentTarget.dataset.uuid);
   }
 
@@ -438,7 +589,16 @@ class MKActorsApp extends Application {
     event.stopPropagation();
 
     const uuid = event.currentTarget.dataset.uuid;
+    debugLog("Spawn button clicked", { uuid });
     await MKActorsApi.spawnAtViewCenter(uuid);
+  }
+}
+
+class MKActorsOpenGalleryMenu extends FormApplication {
+  render(_force, _options = {}) {
+    debugLog("Settings menu launcher opened");
+    MKActorsApi.open();
+    return this;
   }
 }
 
@@ -450,7 +610,7 @@ function registerSettings() {
     config: true,
     type: Boolean,
     default: true,
-    onChange: () => MKActorsApi.refresh()
+    onChange: (value) => refreshAfterSettingChange("includeWorldActors", value)
   });
 
   game.settings.register(MODULE_ID, "includeCompendiumActors", {
@@ -460,7 +620,7 @@ function registerSettings() {
     config: true,
     type: Boolean,
     default: true,
-    onChange: () => MKActorsApi.refresh()
+    onChange: (value) => refreshAfterSettingChange("includeCompendiumActors", value)
   });
 
   game.settings.register(MODULE_ID, "actorTypes", {
@@ -470,7 +630,7 @@ function registerSettings() {
     config: true,
     type: String,
     default: "",
-    onChange: () => MKActorsApi.refresh()
+    onChange: (value) => refreshAfterSettingChange("actorTypes", value)
   });
 
   game.settings.register(MODULE_ID, "excludedActorTypes", {
@@ -480,7 +640,7 @@ function registerSettings() {
     config: true,
     type: String,
     default: "character,pc,player",
-    onChange: () => MKActorsApi.refresh()
+    onChange: (value) => refreshAfterSettingChange("excludedActorTypes", value)
   });
 
   game.settings.register(MODULE_ID, "showOnlyVisiblePacks", {
@@ -490,7 +650,7 @@ function registerSettings() {
     config: true,
     type: Boolean,
     default: true,
-    onChange: () => MKActorsApi.refresh()
+    onChange: (value) => refreshAfterSettingChange("showOnlyVisiblePacks", value)
   });
 
   game.settings.register(MODULE_ID, "cardSize", {
@@ -505,7 +665,27 @@ function registerSettings() {
       max: 260,
       step: 10
     },
-    onChange: () => MKActorsApi.refresh()
+    onChange: (value) => refreshAfterSettingChange("cardSize", value)
+  });
+
+  game.settings.register(MODULE_ID, "syncPortraitToTokenImage", {
+    name: game.i18n.localize("MKACTORS.SyncPortraitToTokenImage"),
+    hint: game.i18n.localize("MKACTORS.SyncPortraitToTokenImageHint"),
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: (value) => debugLog("Setting changed", { setting: "syncPortraitToTokenImage", value })
+  });
+
+  game.settings.register(MODULE_ID, "debugMode", {
+    name: game.i18n.localize("MKACTORS.DebugMode"),
+    hint: game.i18n.localize("MKACTORS.DebugModeHint"),
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: (value) => debugLog("Debug mode changed", { enabled: value })
   });
 
   game.settings.registerMenu(MODULE_ID, "openGallery", {
@@ -513,9 +693,10 @@ function registerSettings() {
     label: game.i18n.localize("MKACTORS.Open"),
     hint: game.i18n.localize("MKACTORS.OpenHint"),
     icon: "fas fa-users-viewfinder",
-    type: MKActorsApp,
+    type: MKActorsOpenGalleryMenu,
     restricted: false
   });
+  debugLog("Settings registered");
 }
 
 function registerKeybinding() {
@@ -531,12 +712,332 @@ function registerKeybinding() {
       }
     ],
     onDown: () => {
+      debugLog("Open gallery keybinding pressed");
       MKActorsApi.open();
       return true;
     },
     restricted: false,
     precedence: CONST.KEYBINDING_PRECEDENCE?.NORMAL ?? 0
   });
+  debugLog("Keybinding registered", { id: "openGallery" });
+}
+
+let activePortraitContextMenu = null;
+
+function closePortraitContextMenu() {
+  if (activePortraitContextMenu) {
+    activePortraitContextMenu.close();
+    return;
+  }
+
+  document.querySelector(".mk-actors-context-menu")?.remove();
+}
+
+function localize(key) {
+  return game.i18n.localize(`MKACTORS.${key}`);
+}
+
+function isDebugModeEnabled() {
+  try {
+    return globalThis.game?.settings?.get(MODULE_ID, "debugMode") === true;
+  } catch (_err) {
+    return false;
+  }
+}
+
+function debugLog(message, data = undefined) {
+  if (!isDebugModeEnabled()) return;
+
+  if (data === undefined) {
+    console.debug(`MK Actors | ${message}`);
+  } else {
+    console.debug(`MK Actors | ${message}`, data);
+  }
+}
+
+function refreshAfterSettingChange(setting, value) {
+  debugLog("Setting changed", { setting, value });
+  MKActorsApi.refresh();
+}
+
+function escapeHtml(value) {
+  const element = document.createElement("textarea");
+  element.textContent = String(value ?? "");
+  return element.innerHTML;
+}
+
+function numberOrFallback(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function openTokenPortraitDialog(actor) {
+  const prototypeToken = actor.prototypeToken;
+  const portraitImage = actor.img ?? "";
+  const width = prototypeToken?.width ?? 1;
+  const height = prototypeToken?.height ?? 1;
+  const fit = prototypeToken?.texture?.fit || "height";
+  const anchorX = prototypeToken?.texture?.anchorX ?? 0.5;
+  const anchorY = prototypeToken?.texture?.anchorY ?? 0.5;
+  const scale = prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1;
+  const actorName = escapeHtml(actor.name || localize("UnnamedActor"));
+  const fitOptions = [
+    { value: "contain", label: localize("FitContain") },
+    { value: "cover", label: localize("FitCover") },
+    { value: "fill", label: localize("FitFill") },
+    { value: "height", label: localize("FitHeight") },
+    { value: "width", label: localize("FitWidth") }
+  ].map((option) => `
+      <option value="${option.value}" ${option.value === fit ? "selected" : ""}>${option.label}</option>
+    `).join("");
+
+  debugLog("Opening token portrait dialog", {
+    actorId: actor.id,
+    actorUuid: actor.uuid,
+    actorName: actor.name,
+    portraitImage,
+    tokenImage: prototypeToken?.texture?.src || "",
+    width,
+    height,
+    fit,
+    anchorX,
+    anchorY,
+    scale
+  });
+
+  new Dialog({
+    title: `${localize("TokenPortraitDialogTitle")}: ${actorName}`,
+    content: `
+<form class="mk-actors-token-editor">
+  <div class="form-group">
+    <label>${localize("ImagePath")}</label>
+    <div class="mk-actors-token-editor__row">
+      <input id="mk-portrait-img" type="text" value="${escapeHtml(portraitImage)}">
+      <button type="button" id="mk-browse-portrait" title="${localize("BrowseImage")}"><i class="fas fa-folder-open"></i></button>
+    </div>
+    <p class="notes">${localize("ImagePathPortraitNote")}</p>
+  </div>
+
+  <div class="form-group">
+    <label>${localize("DimensionsGridSpaces")}</label>
+    <div class="mk-actors-token-editor__dimensions">
+      <label>
+        <span>${localize("Width")}</span>
+        <input id="mk-token-width" type="number" step="0.5" value="${escapeHtml(width)}">
+      </label>
+      <label>
+        <span>${localize("Height")}</span>
+        <input id="mk-token-height" type="number" step="0.5" value="${escapeHtml(height)}">
+      </label>
+    </div>
+    <p class="notes">${localize("FitModeHeightNote")}</p>
+  </div>
+
+  <div class="form-group">
+    <label>${localize("ImageFitMode")}</label>
+    <select id="mk-token-fit">${fitOptions}</select>
+    <p class="notes">${localize("ImageFitModeHint")}</p>
+  </div>
+
+  <div class="form-group">
+    <label>${localize("Anchor")}</label>
+    <div class="mk-actors-token-editor__dimensions">
+      <label>
+        <span>${localize("X")}</span>
+        <input id="mk-token-anchor-x" type="number" step="0.1" value="${escapeHtml(anchorX)}">
+      </label>
+      <label>
+        <span>${localize("Y")}</span>
+        <input id="mk-token-anchor-y" type="number" step="0.1" value="${escapeHtml(anchorY)}">
+      </label>
+    </div>
+    <p class="notes">${localize("AnchorHint")}</p>
+  </div>
+
+  <div class="form-group">
+    <label>${localize("ScaleRatio")}</label>
+    <div class="mk-actors-token-editor__scale">
+      <input id="mk-token-scale-range" type="range" min="0.2" max="3" step="0.05" value="${escapeHtml(scale)}">
+      <input id="mk-token-scale" type="number" min="0.2" step="0.05" value="${escapeHtml(scale)}">
+    </div>
+  </div>
+</form>
+    `,
+    buttons: {
+      apply: {
+        icon: '<i class="fas fa-check"></i>',
+        label: localize("Apply"),
+        callback: async (html) => {
+          const portraitImg = String(html.find("#mk-portrait-img").val() ?? "").trim();
+          const tokenWidth = numberOrFallback(html.find("#mk-token-width").val(), width);
+          const tokenHeight = numberOrFallback(html.find("#mk-token-height").val(), height);
+          const tokenFit = String(html.find("#mk-token-fit").val() ?? "height");
+          const tokenAnchorX = numberOrFallback(html.find("#mk-token-anchor-x").val(), anchorX);
+          const tokenAnchorY = numberOrFallback(html.find("#mk-token-anchor-y").val(), anchorY);
+          const tokenScale = numberOrFallback(html.find("#mk-token-scale").val(), scale);
+
+          if (!portraitImg) {
+            debugLog("Token portrait update blocked: image path required", {
+              actorId: actor.id,
+              actorUuid: actor.uuid
+            });
+            ui.notifications.warn(localize("ImagePathRequired"));
+            return;
+          }
+
+          const updates = {
+            img: portraitImg,
+            "prototypeToken.width": tokenWidth,
+            "prototypeToken.height": tokenHeight,
+            "prototypeToken.texture.fit": tokenFit,
+            "prototypeToken.texture.anchorX": tokenAnchorX,
+            "prototypeToken.texture.anchorY": tokenAnchorY,
+            "prototypeToken.texture.scaleX": tokenScale,
+            "prototypeToken.texture.scaleY": tokenScale
+          };
+
+          try {
+            debugLog("Updating Actor from token portrait dialog", {
+              actorId: actor.id,
+              actorUuid: actor.uuid,
+              updates
+            });
+            await actor.update(updates, { mkActorsForcePortraitToTokenImage: true });
+            MKActorsApi.refresh();
+            debugLog("Actor updated from token portrait dialog", {
+              actorId: actor.id,
+              actorUuid: actor.uuid
+            });
+            ui.notifications.info(game.i18n.format("MKACTORS.TokenPortraitUpdated", { name: actor.name }));
+          } catch (err) {
+            debugLog("Token portrait update failed", {
+              actorId: actor.id,
+              actorUuid: actor.uuid,
+              error: err
+            });
+            console.error(err);
+            ui.notifications.error(game.i18n.format("MKACTORS.TokenPortraitUpdateFailed", {
+              message: err.message ?? err
+            }));
+          }
+        }
+      },
+      cancel: {
+        icon: '<i class="fas fa-times"></i>',
+        label: localize("Cancel")
+      }
+    },
+    render: (html) => {
+      const portraitInput = html.find("#mk-portrait-img")[0];
+      const scaleRange = html.find("#mk-token-scale-range")[0];
+      const scaleInput = html.find("#mk-token-scale")[0];
+
+      html.find("#mk-browse-portrait").on("click", () => {
+        new FilePicker({
+          type: "image",
+          current: portraitInput.value || "",
+          callback: (path) => {
+            portraitInput.value = path;
+            debugLog("Token portrait image selected", {
+              actorId: actor.id,
+              actorUuid: actor.uuid,
+              path
+            });
+          }
+        }).browse();
+      });
+
+      scaleRange?.addEventListener("input", () => {
+        scaleInput.value = scaleRange.value;
+      });
+
+      scaleInput?.addEventListener("input", () => {
+        scaleRange.value = scaleInput.value;
+      });
+    },
+    default: "apply"
+  }).render(true);
+}
+
+function setUpdateProperty(changes, path, value) {
+  changes[path] = value;
+}
+
+function shouldSyncPortraitToTokenImage(changes, options = {}) {
+  if (options.mkActorsSyncPortraitToTokenImage) {
+    debugLog("Portrait sync skipped: update was created by MK Actors sync", { changes });
+    return false;
+  }
+  const enabled = options.mkActorsForcePortraitToTokenImage || game.settings.get(MODULE_ID, "syncPortraitToTokenImage");
+  if (!enabled) {
+    debugLog("Portrait sync skipped: setting disabled", { changes });
+    return false;
+  }
+  if (!Object.prototype.hasOwnProperty.call(changes, "img")) {
+    debugLog("Portrait sync skipped: Actor image not changed", { changes });
+    return false;
+  }
+  if (typeof changes.img !== "string") {
+    debugLog("Portrait sync skipped: Actor image change was not a string", { image: changes.img });
+    return false;
+  }
+  if (!changes.img) {
+    debugLog("Portrait sync skipped: Actor image change was empty");
+    return false;
+  }
+  return true;
+}
+
+function syncPortraitToTokenImage(actor, changes, options) {
+  if (!shouldSyncPortraitToTokenImage(changes, options)) return;
+
+  setUpdateProperty(changes, "prototypeToken.texture.src", changes.img);
+  debugLog("Portrait sync applied before Actor update", {
+    actorId: actor?.id,
+    actorUuid: actor?.uuid,
+    image: changes.img
+  });
+}
+
+async function ensurePortraitSyncedToTokenImage(actor, changes, options) {
+  if (!shouldSyncPortraitToTokenImage(changes, options)) return;
+
+  const portraitImage = actor.img || changes.img;
+  const tokenImage = actor.prototypeToken?.texture?.src || "";
+  if (!portraitImage || tokenImage === portraitImage) {
+    debugLog("Portrait sync follow-up skipped: prototype token already matches", {
+      actorId: actor.id,
+      actorUuid: actor.uuid,
+      portraitImage,
+      tokenImage
+    });
+    return;
+  }
+
+  try {
+    debugLog("Portrait sync follow-up updating prototype token image", {
+      actorId: actor.id,
+      actorUuid: actor.uuid,
+      portraitImage,
+      tokenImage
+    });
+    await actor.update(
+      { "prototypeToken.texture.src": portraitImage },
+      { mkActorsSyncPortraitToTokenImage: true }
+    );
+    debugLog("Portrait sync follow-up complete", {
+      actorId: actor.id,
+      actorUuid: actor.uuid,
+      portraitImage
+    });
+  } catch (err) {
+    debugLog("Portrait sync follow-up failed", {
+      actorId: actor.id,
+      actorUuid: actor.uuid,
+      error: err
+    });
+    console.warn("MK Actors | Failed to sync portrait to token image.", err);
+  }
 }
 
 function addDirectoryButton(_app, html) {
@@ -552,8 +1053,12 @@ function addDirectoryButton(_app, html) {
   button.className = "mk-actors-directory-button";
   button.title = game.i18n.localize("MKACTORS.Open");
   button.innerHTML = `<i class="fas fa-users-viewfinder"></i>`;
-  button.addEventListener("click", () => MKActorsApi.open());
+  button.addEventListener("click", () => {
+    debugLog("Actor Directory button clicked");
+    MKActorsApi.open();
+  });
   header.appendChild(button);
+  debugLog("Actor Directory button added");
 }
 
 function addSceneControlButton(controls) {
@@ -564,14 +1069,21 @@ function addSceneControlButton(controls) {
     icon: "fas fa-users-viewfinder",
     button: true,
     visible: true,
-    onClick: () => MKActorsApi.open(),
-    onChange: () => MKActorsApi.open()
+    onClick: () => {
+      debugLog("Scene control button clicked");
+      MKActorsApi.open();
+    },
+    onChange: () => {
+      debugLog("Scene control changed");
+      MKActorsApi.open();
+    }
   };
 
   if (Array.isArray(controls)) {
     const group = controls.find((control) => ["token", "tokens"].includes(control.name)) || controls[0];
     if (Array.isArray(group?.tools) && !group.tools.some((existing) => existing.name === tool.name)) {
       group.tools.push(tool);
+      debugLog("Scene control button added", { group: group.name || "" });
     }
     return;
   }
@@ -581,22 +1093,30 @@ function addSceneControlButton(controls) {
   if (!tokenControls?.tools) return;
 
   if (Array.isArray(tokenControls.tools)) {
-    if (!tokenControls.tools.some((existing) => existing.name === tool.name)) tokenControls.tools.push(tool);
+    if (!tokenControls.tools.some((existing) => existing.name === tool.name)) {
+      tokenControls.tools.push(tool);
+      debugLog("Scene control button added", { shape: "array" });
+    }
   } else if (!tokenControls.tools[tool.name]) {
     tokenControls.tools[tool.name] = tool;
+    debugLog("Scene control button added", { shape: "object" });
   }
 }
 
 Hooks.once("init", () => {
   registerSettings();
   registerKeybinding();
+  debugLog("Init hook complete");
 });
 
 Hooks.once("ready", () => {
   globalThis.MKActors = MKActorsApi;
   const module = game.modules.get(MODULE_ID);
   if (module) module.api = MKActorsApi;
+  debugLog("Ready hook complete", { moduleId: MODULE_ID, apiRegistered: Boolean(module) });
 });
 
 Hooks.on("renderActorDirectory", addDirectoryButton);
 Hooks.on("getSceneControlButtons", addSceneControlButton);
+Hooks.on("preUpdateActor", syncPortraitToTokenImage);
+Hooks.on("updateActor", ensurePortraitSyncedToTokenImage);

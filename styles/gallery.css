@@ -201,6 +201,75 @@
   margin-left: 4px;
 }
 
+.mk-actors-token-editor__row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mk-actors-token-editor__row input {
+  flex: 1;
+}
+
+.mk-actors-token-editor__dimensions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mk-actors-token-editor__dimensions label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mk-actors-token-editor__dimensions span {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.mk-actors-token-editor__scale {
+  display: grid;
+  grid-template-columns: 1fr 72px;
+  gap: 10px;
+  align-items: center;
+}
+
+.mk-actors-token-editor__scale input[type="range"] {
+  width: 100%;
+}
+
+.mk-actors-context-menu {
+  position: fixed;
+  z-index: 100000;
+  min-width: 220px;
+  padding: 4px;
+  background: rgba(20, 20, 20, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.mk-actors-context-menu button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 8px;
+  color: #f4f1e8;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mk-actors-context-menu button:hover,
+.mk-actors-context-menu button:focus {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 @media (max-width: 760px) {
   .mk-actors__toolbar {
     grid-template-columns: 1fr 1fr 36px 36px;

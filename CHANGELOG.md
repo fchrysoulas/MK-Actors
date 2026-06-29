@@ -10,9 +10,16 @@ This project follows semantic versioning where practical:
 
 ## Unreleased
 
+## 0.2.0
+
 - Added double-click opening for Actor cards.
 - Improved portrait dragging so dragging from an Actor image uses the Actor card drag data.
 - Added GitHub release URLs to the source module manifest.
+- Added a world setting to sync Actor portrait changes to prototype token images.
+- Added a client debug mode setting that logs module settings changes, UI actions, Foundry document calls, token spawning, and portrait sync hooks.
+- Fixed portrait-to-token-image sync to apply after Actor updates when needed.
+- Fixed the settings menu launcher to use a valid FormApplication type.
+- Added a right-click portrait context menu for portrait image, prototype token dimensions, fit mode, anchor, and scale.
 
 ## 0.1.1
 
