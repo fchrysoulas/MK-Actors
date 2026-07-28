@@ -5,7 +5,7 @@
       <input type="search" name="search" value="{{state.search}}" placeholder="{{localize 'MKACTORS.Search'}}" autocomplete="off" data-action="search">
     </div>
 
-    <label>
+    <label class="mk-actors__filter">
       <span>{{localize 'MKACTORS.Type'}}</span>
       <select name="type" data-action="type">
         {{#each types}}
@@ -14,13 +14,15 @@
       </select>
     </label>
 
-    <button type="button" data-action="clear" title="{{localize 'MKACTORS.Clear'}}" aria-label="{{localize 'MKACTORS.Clear'}}">
-      <i class="fas fa-eraser"></i>
-    </button>
+    <div class="mk-actors__toolbar-actions">
+      <button type="button" data-action="clear" title="{{localize 'MKACTORS.Clear'}}" aria-label="{{localize 'MKACTORS.Clear'}}">
+        <i class="fas fa-eraser"></i>
+      </button>
 
-    <button type="button" data-action="refresh" title="{{localize 'MKACTORS.Refresh'}}" aria-label="{{localize 'MKACTORS.Refresh'}}">
-      <i class="fas fa-sync-alt"></i>
-    </button>
+      <button type="button" data-action="refresh" title="{{localize 'MKACTORS.Refresh'}}" aria-label="{{localize 'MKACTORS.Refresh'}}">
+        <i class="fas fa-sync-alt"></i>
+      </button>
+    </div>
   </header>
 
   <div class="mk-actors__body">
@@ -43,14 +45,21 @@
     </aside>
 
     <main class="mk-actors__main">
-      <div class="mk-actors__summary">
-        <span>{{localize 'MKACTORS.Showing'}}</span>
-        <span>{{actors.length}}</span>
-        <span>{{localize 'MKACTORS.Of'}}</span>
-        <span data-role="result-count">{{resultCount}}</span>
-        <span>{{localize 'MKACTORS.ActorsCountLabel'}}</span>
+      <div class="mk-actors__summary" aria-live="polite">
+        <span class="mk-actors__summary-chip">
+          <i class="fas fa-users" aria-hidden="true"></i>
+          <span>{{localize 'MKACTORS.Showing'}}</span>
+          <strong>{{actors.length}}</strong>
+          <span>{{localize 'MKACTORS.Of'}}</span>
+          <strong data-role="result-count">{{resultCount}}</strong>
+          <span>{{localize 'MKACTORS.ActorsCountLabel'}}</span>
+        </span>
         {{#if warnings}}
-          <span class="mk-actors__warning"><i class="fas fa-triangle-exclamation"></i> {{warnings.length}} {{localize 'MKACTORS.SourceWarnings'}}</span>
+          <span class="mk-actors__warning">
+            <i class="fas fa-triangle-exclamation"></i>
+            <strong>{{warnings.length}}</strong>
+            <span>{{localize 'MKACTORS.SourceWarnings'}}</span>
+          </span>
         {{/if}}
       </div>
 
@@ -99,7 +108,7 @@
         </ol>
       {{else}}
         <div class="mk-actors__empty">
-          <i class="fas fa-users-slash"></i>
+          <span class="mk-actors__empty-icon"><i class="fas fa-users-slash"></i></span>
           <p>{{localize 'MKACTORS.NoActors'}}</p>
         </div>
       {{/if}}

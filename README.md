@@ -20,6 +20,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Filter by source from a left tree view with World folders, unfiled World actors, and Actor compendiums.
 - Render large result sets in batches while loading Actor compendium indexes concurrently.
 - Show each Actor as a square 1:1 portrait card with only its name as visible metadata.
+- Use a card-based dark glassmorphism interface tailored to Foundry ApplicationV2.
 - Keep the gallery's vertical scrollbar visible so card columns do not shift as results change.
 - Drag cards onto a Scene.
 - Drag from an Actor portrait as part of the card.
@@ -126,6 +127,7 @@ mk-actors/
   templates/gallery.hbs
   templates/token-portrait-dialog.hbs
   tests/module.test.js
+  docs/UI_STYLE_RULES.md
 ```
 
 ## Development

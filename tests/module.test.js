@@ -22,7 +22,10 @@ globalThis.game = {
 const { MKActorsApi } = await import("../scripts/api.js");
 const { MKActorsApp } = await import("../scripts/gallery-app.js");
 const { addSceneControlButton } = await import("../scripts/hooks.js");
-const { openTokenPortraitDialog } = await import("../scripts/token-portrait-dialog.js");
+const {
+  openTokenPortraitDialog,
+  resolveFilePickerClass
+} = await import("../scripts/token-portrait-dialog.js");
 
 test("Actor visibility uses LIMITED permission and fails closed", () => {
   let requestedPermission = null;
@@ -66,6 +69,31 @@ test("numeric token values are rounded and clamped", () => {
   assert.equal(normalizeNumber(-3, 1, { min: 0.5, step: 0.5 }), 0.5);
   assert.equal(normalizeNumber(4, 1, { min: 0.2, max: 3, step: 0.05 }), 3);
   assert.equal(normalizeNumber("invalid", 0.5, { min: 0, max: 1, step: 0.1 }), 0.5);
+});
+
+test("FilePicker resolution supports v12 globals and v13 namespaced classes", () => {
+  const priorGlobalPicker = globalThis.FilePicker;
+  const priorApps = foundry.applications.apps;
+  class V12FilePicker {}
+  class V13FilePicker {}
+
+  foundry.applications.apps = { FilePicker: {} };
+  globalThis.FilePicker = V12FilePicker;
+  assert.equal(resolveFilePickerClass(), V12FilePicker);
+
+  delete globalThis.FilePicker;
+  foundry.applications.apps.FilePicker = {
+    default: {
+      FilePicker: {
+        implementation: V13FilePicker
+      }
+    }
+  };
+  assert.equal(resolveFilePickerClass(), V13FilePicker);
+
+  if (priorGlobalPicker === undefined) delete globalThis.FilePicker;
+  else globalThis.FilePicker = priorGlobalPicker;
+  foundry.applications.apps = priorApps;
 });
 
 test("DialogV2 token editor submits validated normalized updates", async () => {

@@ -62,6 +62,8 @@
   "MKACTORS.Apply": "Apply",
   "MKACTORS.Cancel": "Cancel",
   "MKACTORS.ImagePathRequired": "Please provide an Image Path.",
+  "MKACTORS.FilePickerUnavailable": "MK Actors | No compatible image browser is available.",
+  "MKACTORS.FilePickerFailed": "MK Actors | Could not open the image browser: {message}",
   "MKACTORS.TokenPortraitUpdated": "MK Actors | Updated: {name}",
   "MKACTORS.TokenPortraitUpdateFailed": "MK Actors | Failed: {message}",
   "MKACTORS.NoActors": "No Actors matched the current filters.",

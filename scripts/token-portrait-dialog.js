@@ -2,6 +2,48 @@ import { MODULE_ID } from "./constants.js";
 import { debugLog } from "./debug.js";
 import { localize, normalizeNumber } from "./utils.js";
 
+export function resolveFilePickerClass() {
+  let legacyBinding = null;
+  try {
+    if (typeof FilePicker !== "undefined") legacyBinding = FilePicker;
+  } catch (_err) {
+    // The v12 compatibility global is unavailable.
+  }
+
+  const queue = [
+    legacyBinding,
+    globalThis.FilePicker,
+    globalThis.foundry?.applications?.apps?.FilePicker
+  ];
+  const visited = new Set();
+
+  while (queue.length) {
+    const candidate = queue.shift();
+    if (candidate == null || visited.has(candidate)) continue;
+    visited.add(candidate);
+
+    if (typeof candidate === "function") {
+      try {
+        Reflect.construct(Object, [], candidate);
+        return candidate;
+      } catch (_err) {
+        // Continue unwrapping non-constructable function exports.
+      }
+    }
+
+    if (typeof candidate !== "object" && typeof candidate !== "function") continue;
+    for (const key of ["implementation", "FilePicker", "default"]) {
+      try {
+        if (candidate[key] != null) queue.push(candidate[key]);
+      } catch (_err) {
+        // Ignore inaccessible export properties and try the remaining shapes.
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) {
   const prototypeToken = actor.prototypeToken;
   const portraitImage = actor.img ?? "";
@@ -66,6 +108,7 @@ export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) 
   const DialogV2 = foundry.applications.api.DialogV2;
   const allowedFits = new Set(fitOptions.map((option) => option.value));
   const dialog = new DialogV2({
+    classes: ["mk-actors-token-dialog"],
     window: {
       title: `${localize("TokenPortraitDialogTitle")}: ${actorName}`
     },
@@ -181,21 +224,34 @@ export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) 
   const scaleRange = root.querySelector?.("#mk-token-scale-range");
   const scaleInput = root.querySelector?.("#mk-token-scale");
 
-  root.querySelector?.("#mk-browse-portrait")?.addEventListener("click", () => {
-    const FilePickerClass = foundry.applications.apps?.FilePicker || globalThis.FilePicker;
-    const picker = new FilePickerClass({
-      type: "image",
-      current: portraitInput?.value || "",
-      callback: (path) => {
-        if (portraitInput) portraitInput.value = path;
-        debugLog("Token portrait image selected", {
-          actorId: actor.id,
-          actorUuid: actor.uuid,
-          path
-        });
-      }
-    });
-    picker.browse();
+  root.querySelector?.("#mk-browse-portrait")?.addEventListener("click", async () => {
+    const FilePickerClass = resolveFilePickerClass();
+    if (!FilePickerClass) {
+      console.error("MK Actors | No compatible Foundry FilePicker constructor is available.");
+      ui.notifications.error(localize("FilePickerUnavailable"));
+      return;
+    }
+
+    try {
+      const picker = new FilePickerClass({
+        type: "image",
+        current: portraitInput?.value || "",
+        callback: (path) => {
+          if (portraitInput) portraitInput.value = path;
+          debugLog("Token portrait image selected", {
+            actorId: actor.id,
+            actorUuid: actor.uuid,
+            path
+          });
+        }
+      });
+      await picker.browse();
+    } catch (err) {
+      console.error(err);
+      ui.notifications.error(game.i18n.format("MKACTORS.FilePickerFailed", {
+        message: err.message ?? err
+      }));
+    }
   });
 
   scaleRange?.addEventListener("input", () => {

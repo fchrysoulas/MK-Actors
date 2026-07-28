@@ -28,6 +28,7 @@ scripts/token-portrait-dialog.js Prototype token appearance dialog logic
 styles/gallery.css       Application styling
 templates/gallery.hbs    Handlebars application template
 templates/token-portrait-dialog.hbs Prototype token appearance dialog template
+docs/UI_STYLE_RULES.md   Reusable ApplicationV2 UI design contract
 ```
 
 ## Foundry Compatibility
@@ -69,6 +70,7 @@ https://foundryvtt.wiki/en/development/getting-started-with-development
 ## UI And Styling
 
 - The app is a Foundry `ApplicationV2` using `templates/gallery.hbs`.
+- Follow `docs/UI_STYLE_RULES.md` for the shared card-based dark glassmorphism design contract.
 - Keep CSS scoped under `.mk-actors` or `.mk-actors-app` where possible.
 - Preserve draggable Actor cards and icon-only action buttons with meaningful `title` attributes.
 - Maintain responsive behavior for narrow Foundry windows.
@@ -76,11 +78,12 @@ https://foundryvtt.wiki/en/development/getting-started-with-development
 
 ## Verification
 
-There is no automated test suite in this repository at the moment. For code changes, do the strongest practical verification available:
+The repository includes a dependency-free Node test suite. For code changes, do the strongest practical verification available:
 
-1. Check JSON validity for `module.json` and localization files.
-2. Review JavaScript syntax for obvious parse errors.
-3. If Foundry is available, install or symlink the module into `FoundryVTT/Data/modules/mk-actors`, enable it in a world, and verify:
+1. Run `npm test`.
+2. Check JSON validity for `module.json` and localization files.
+3. Review JavaScript syntax for obvious parse errors.
+4. If Foundry is available, install or symlink the module into `FoundryVTT/Data/modules/mk-actors`, enable it in a world, and verify:
    - The gallery opens from configured entry points.
    - World Actors and visible Actor compendiums appear.
    - Search, type filter, source filter, clear, and refresh work.
