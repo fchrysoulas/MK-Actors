@@ -12,7 +12,7 @@ class MKActorsOpenGalleryMenu extends foundry.applications.api.ApplicationV2 {
 
 function refreshAfterSettingChange(setting, value) {
   debugLog("Setting changed", { setting, value });
-  MKActorsApi.refresh();
+  MKActorsApi.refresh({ open: false });
 }
 
 export function registerSettings() {

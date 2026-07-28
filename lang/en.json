@@ -26,6 +26,9 @@
   "MKACTORS.AllSources": "All Sources",
   "MKACTORS.Refresh": "Refresh",
   "MKACTORS.Clear": "Clear",
+  "MKACTORS.Showing": "Showing",
+  "MKACTORS.Of": "of",
+  "MKACTORS.LoadMore": "Load more",
   "MKACTORS.ActorsCountLabel": "Actors",
   "MKACTORS.SourceWarnings": "source warnings",
   "MKACTORS.SourceWarningsConsole": "MK Actors source warnings",
@@ -65,5 +68,6 @@
   "MKACTORS.World": "World",
   "MKACTORS.Compendium": "Compendium",
   "MKACTORS.LoadingFailed": "MK Actors | Failed to load some Actor sources. Check the console for details.",
-  "MKACTORS.CannotResolveActor": "MK Actors | Could not resolve that Actor."
+  "MKACTORS.CannotResolveActor": "MK Actors | Could not resolve that Actor.",
+  "MKACTORS.CannotModifyActor": "MK Actors | You do not have permission to modify that Actor."
 }

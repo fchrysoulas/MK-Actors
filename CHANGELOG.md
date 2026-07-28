@@ -11,6 +11,17 @@ This project follows semantic versioning where practical:
 ## Unreleased
 
 - Added a left source tree that filters by all sources, World folders, unfiled World actors, and Actor compendiums.
+- Simplified Actor cards to square 1:1 portrait previews with name-only metadata.
+- Kept the gallery's vertical scrollbar visible to prevent layout shifts between result sets.
+- Improved Actor Directory and Scene Controls button injection across Foundry v12-v13 control layouts, including the ordered v13 tool shape.
+- Kept all gallery launch paths available to non-GM users while filtering world Actors by Foundry visibility permissions.
+- Restricted prototype token appearance editing to users who can update the selected Actor.
+- Prevented settings and document refreshes from opening a closed gallery.
+- Added automatic cache invalidation for Actor, Actor folder, and compendium changes.
+- Loaded compendium indexes concurrently and rendered large Actor result sets in batches.
+- Migrated the prototype token appearance editor to DialogV2 and added validation, bounds, and appropriate rounding for token values.
+- Localized unnamed Actor fallbacks and added accessible labels and keyboard portrait editing.
+- Added the MIT license text and a dependency-free Node test suite.
 
 ## 0.2.1
 

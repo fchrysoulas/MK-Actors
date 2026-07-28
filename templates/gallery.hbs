@@ -14,11 +14,11 @@
       </select>
     </label>
 
-    <button type="button" data-action="clear" title="{{localize 'MKACTORS.Clear'}}">
+    <button type="button" data-action="clear" title="{{localize 'MKACTORS.Clear'}}" aria-label="{{localize 'MKACTORS.Clear'}}">
       <i class="fas fa-eraser"></i>
     </button>
 
-    <button type="button" data-action="refresh" title="{{localize 'MKACTORS.Refresh'}}">
+    <button type="button" data-action="refresh" title="{{localize 'MKACTORS.Refresh'}}" aria-label="{{localize 'MKACTORS.Refresh'}}">
       <i class="fas fa-sync-alt"></i>
     </button>
   </header>
@@ -44,7 +44,10 @@
 
     <main class="mk-actors__main">
       <div class="mk-actors__summary">
-        <span data-role="result-count">{{actors.length}}</span>
+        <span>{{localize 'MKACTORS.Showing'}}</span>
+        <span>{{actors.length}}</span>
+        <span>{{localize 'MKACTORS.Of'}}</span>
+        <span data-role="result-count">{{resultCount}}</span>
         <span>{{localize 'MKACTORS.ActorsCountLabel'}}</span>
         {{#if warnings}}
           <span class="mk-actors__warning"><i class="fas fa-triangle-exclamation"></i> {{warnings.length}} {{localize 'MKACTORS.SourceWarnings'}}</span>
@@ -59,28 +62,40 @@
                 data-action="drag-actor"
                 data-uuid="{{uuid}}"
                 data-name="{{name}}"
-                data-type="{{type}}"
-                data-source-kind="{{sourceKind}}"
-                data-source-id="{{sourceId}}"
-                data-search="{{searchText}}"
                 title="{{localize 'MKACTORS.CardHint'}}">
               <div class="mk-actors__portrait">
-                <img src="{{img}}" alt="{{name}}" loading="lazy" draggable="false" data-action="edit-token-portrait" onerror="this.src='icons/svg/mystery-man.svg';">
+                <img src="{{img}}"
+                     alt="{{name}}"
+                     title="{{localize 'MKACTORS.EditTokenPortrait'}}"
+                     aria-label="{{localize 'MKACTORS.EditTokenPortrait'}}: {{name}}"
+                     loading="lazy"
+                     draggable="false"
+                     tabindex="0"
+                     role="button"
+                     data-action="edit-token-portrait">
               </div>
               <div class="mk-actors__content">
                 <h3>{{name}}</h3>
-                <div class="mk-actors__badges">
-                  {{#if typeLabel}}<span>{{typeLabel}}</span>{{/if}}
-                  <span>{{sourceLabel}}</span>
-                </div>
               </div>
               <div class="mk-actors__actions">
-                <button type="button" data-action="open-sheet" data-uuid="{{uuid}}" title="{{localize 'MKACTORS.OpenSheet'}}">
+                <button type="button"
+                        data-action="open-sheet"
+                        data-uuid="{{uuid}}"
+                        title="{{localize 'MKACTORS.OpenSheet'}}"
+                        aria-label="{{localize 'MKACTORS.OpenSheet'}}">
                   <i class="fas fa-up-right-from-square"></i>
                 </button>
               </div>
             </li>
           {{/each}}
+          {{#if hasMore}}
+            <li class="mk-actors__load-more">
+              <button type="button" data-action="load-more">
+                <i class="fas fa-chevron-down"></i>
+                <span>{{localize 'MKACTORS.LoadMore'}}</span>
+              </button>
+            </li>
+          {{/if}}
         </ol>
       {{else}}
         <div class="mk-actors__empty">

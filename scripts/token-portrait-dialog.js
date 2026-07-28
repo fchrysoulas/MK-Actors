@@ -1,6 +1,6 @@
 import { MODULE_ID } from "./constants.js";
 import { debugLog } from "./debug.js";
-import { escapeHtml, localize, numberOrFallback } from "./utils.js";
+import { localize, normalizeNumber } from "./utils.js";
 
 export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) {
   const prototypeToken = actor.prototypeToken;
@@ -11,7 +11,7 @@ export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) 
   const anchorX = prototypeToken?.texture?.anchorX ?? 0.5;
   const anchorY = prototypeToken?.texture?.anchorY ?? 0.5;
   const scale = prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1;
-  const actorName = escapeHtml(actor.name || localize("UnnamedActor"));
+  const actorName = actor.name || localize("UnnamedActor");
   const fitOptions = [
     { value: "contain", label: localize("FitContain") },
     { value: "cover", label: localize("FitCover") },
@@ -63,21 +63,55 @@ export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) 
     scale
   });
 
-  new Dialog({
-    title: `${localize("TokenPortraitDialogTitle")}: ${actorName}`,
+  const DialogV2 = foundry.applications.api.DialogV2;
+  const allowedFits = new Set(fitOptions.map((option) => option.value));
+  const dialog = new DialogV2({
+    window: {
+      title: `${localize("TokenPortraitDialogTitle")}: ${actorName}`
+    },
     content,
-    buttons: {
-      apply: {
-        icon: '<i class="fas fa-check"></i>',
+    modal: true,
+    form: {
+      closeOnSubmit: false
+    },
+    buttons: [
+      {
+        action: "apply",
+        icon: "fas fa-check",
         label: localize("Apply"),
-        callback: async (html) => {
-          const portraitImg = String(html.find("#mk-portrait-img").val() ?? "").trim();
-          const tokenWidth = numberOrFallback(html.find("#mk-token-width").val(), width);
-          const tokenHeight = numberOrFallback(html.find("#mk-token-height").val(), height);
-          const tokenFit = String(html.find("#mk-token-fit").val() ?? "height");
-          const tokenAnchorX = numberOrFallback(html.find("#mk-token-anchor-x").val(), anchorX);
-          const tokenAnchorY = numberOrFallback(html.find("#mk-token-anchor-y").val(), anchorY);
-          const tokenScale = numberOrFallback(html.find("#mk-token-scale").val(), scale);
+        default: true,
+        callback: async (_event, button, dialogElement) => {
+          const form = button.form;
+          if (!form?.reportValidity()) return false;
+
+          const portraitImg = String(form.querySelector("#mk-portrait-img")?.value ?? "").trim();
+          const tokenWidth = normalizeNumber(
+            form.querySelector("#mk-token-width")?.value,
+            width,
+            { min: 0.5, step: 0.5 }
+          );
+          const tokenHeight = normalizeNumber(
+            form.querySelector("#mk-token-height")?.value,
+            height,
+            { min: 0.5, step: 0.5 }
+          );
+          const requestedFit = String(form.querySelector("#mk-token-fit")?.value ?? fit);
+          const tokenFit = allowedFits.has(requestedFit) ? requestedFit : "height";
+          const tokenAnchorX = normalizeNumber(
+            form.querySelector("#mk-token-anchor-x")?.value,
+            anchorX,
+            { min: 0, max: 1 }
+          );
+          const tokenAnchorY = normalizeNumber(
+            form.querySelector("#mk-token-anchor-y")?.value,
+            anchorY,
+            { min: 0, max: 1 }
+          );
+          const tokenScale = normalizeNumber(
+            form.querySelector("#mk-token-scale")?.value,
+            scale,
+            { min: 0.2, max: 3, step: 0.05 }
+          );
 
           if (!portraitImg) {
             debugLog("Token portrait update blocked: image path required", {
@@ -85,7 +119,7 @@ export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) 
               actorUuid: actor.uuid
             });
             ui.notifications.warn(localize("ImagePathRequired"));
-            return;
+            return false;
           }
 
           const updates = {
@@ -106,12 +140,14 @@ export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) 
               updates
             });
             await actor.update(updates, { mkActorsForcePortraitToTokenImage: true });
-            if (onUpdated) onUpdated();
+            if (onUpdated) await onUpdated();
             debugLog("Actor updated from token portrait dialog", {
               actorId: actor.id,
               actorUuid: actor.uuid
             });
             ui.notifications.info(game.i18n.format("MKACTORS.TokenPortraitUpdated", { name: actor.name }));
+            await dialogElement.close();
+            return true;
           } catch (err) {
             debugLog("Token portrait update failed", {
               actorId: actor.id,
@@ -122,42 +158,53 @@ export async function openTokenPortraitDialog(actor, { onUpdated = null } = {}) 
             ui.notifications.error(game.i18n.format("MKACTORS.TokenPortraitUpdateFailed", {
               message: err.message ?? err
             }));
+            return false;
           }
         }
       },
-      cancel: {
-        icon: '<i class="fas fa-times"></i>',
-        label: localize("Cancel")
+      {
+        action: "cancel",
+        icon: "fas fa-times",
+        label: localize("Cancel"),
+        callback: async (_event, _button, dialogElement) => {
+          await dialogElement.close();
+          return null;
+        }
       }
-    },
-    render: (html) => {
-      const portraitInput = html.find("#mk-portrait-img")[0];
-      const scaleRange = html.find("#mk-token-scale-range")[0];
-      const scaleInput = html.find("#mk-token-scale")[0];
+    ]
+  });
 
-      html.find("#mk-browse-portrait").on("click", () => {
-        new FilePicker({
-          type: "image",
-          current: portraitInput.value || "",
-          callback: (path) => {
-            portraitInput.value = path;
-            debugLog("Token portrait image selected", {
-              actorId: actor.id,
-              actorUuid: actor.uuid,
-              path
-            });
-          }
-        }).browse();
-      });
+  await dialog.render({ force: true });
 
-      scaleRange?.addEventListener("input", () => {
-        scaleInput.value = scaleRange.value;
-      });
+  const root = dialog.element;
+  const portraitInput = root.querySelector?.("#mk-portrait-img");
+  const scaleRange = root.querySelector?.("#mk-token-scale-range");
+  const scaleInput = root.querySelector?.("#mk-token-scale");
 
-      scaleInput?.addEventListener("input", () => {
-        scaleRange.value = scaleInput.value;
-      });
-    },
-    default: "apply"
-  }).render(true);
+  root.querySelector?.("#mk-browse-portrait")?.addEventListener("click", () => {
+    const FilePickerClass = foundry.applications.apps?.FilePicker || globalThis.FilePicker;
+    const picker = new FilePickerClass({
+      type: "image",
+      current: portraitInput?.value || "",
+      callback: (path) => {
+        if (portraitInput) portraitInput.value = path;
+        debugLog("Token portrait image selected", {
+          actorId: actor.id,
+          actorUuid: actor.uuid,
+          path
+        });
+      }
+    });
+    picker.browse();
+  });
+
+  scaleRange?.addEventListener("input", () => {
+    if (scaleInput) scaleInput.value = scaleRange.value;
+  });
+
+  scaleInput?.addEventListener("input", () => {
+    if (scaleRange) scaleRange.value = scaleInput.value;
+  });
+
+  return dialog;
 }

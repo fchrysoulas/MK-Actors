@@ -2,6 +2,8 @@ import { MODULE_ID } from "./constants.js";
 import { debugLog } from "./debug.js";
 import { MKActorsApi } from "./api.js";
 
+let galleryRefreshTimer = null;
+
 function setUpdateProperty(changes, path, value) {
   changes[path] = value;
 }
@@ -88,7 +90,10 @@ export function addDirectoryButton(_app, html) {
   if (!root?.querySelector) return;
   if (root.querySelector(".mk-actors-directory-button")) return;
 
-  const header = root.querySelector(".directory-header .header-actions") || root.querySelector(".directory-header");
+  const header = root.querySelector(".directory-header .header-actions")
+    || root.querySelector(".directory-header .header-buttons")
+    || root.querySelector(".directory-header")
+    || root.querySelector("header");
   if (!header) return;
 
   const button = document.createElement("button");
@@ -104,10 +109,81 @@ export function addDirectoryButton(_app, html) {
   debugLog("Actor Directory button added");
 }
 
+function getControlName(control, key = "") {
+  return String(control?.name || control?.id || key || "").toLowerCase();
+}
+
+function isTokenControl(control, key = "") {
+  const name = getControlName(control, key);
+  if (["token", "tokens"].includes(name)) return true;
+
+  const layerName = String(control?.layer?.name || control?.layer || "").toLowerCase();
+  return layerName === "tokenlayer";
+}
+
+function getSceneControlEntries(controls) {
+  if (!controls) return [];
+  if (Array.isArray(controls)) return controls.map((control, index) => [String(index), control]);
+  if (controls instanceof Map) return Array.from(controls.entries());
+  if (typeof controls === "object") return Object.entries(controls);
+  return [];
+}
+
+function findSceneControlGroup(controls) {
+  const entries = getSceneControlEntries(controls);
+  const tokenGroup = entries.find(([key, control]) => isTokenControl(control, key));
+  if (tokenGroup?.[1]) return tokenGroup[1];
+
+  const nestedControls = controls?.controls || controls?.groups;
+  if (nestedControls && nestedControls !== controls) {
+    const nestedGroup = findSceneControlGroup(nestedControls);
+    if (nestedGroup) return nestedGroup;
+  }
+
+  return entries.find(([, control]) => control?.tools)?.[1] || null;
+}
+
+function hasSceneControlTool(tools, name) {
+  if (Array.isArray(tools)) return tools.some((tool) => tool.name === name || tool.id === name);
+  if (tools instanceof Map) return tools.has(name);
+  return Boolean(tools?.[name]);
+}
+
+function getNextSceneControlToolOrder(tools) {
+  const entries = Array.isArray(tools)
+    ? tools
+    : tools instanceof Map
+      ? Array.from(tools.values())
+      : Object.values(tools || {});
+  const orders = entries.map((tool) => Number(tool?.order)).filter(Number.isFinite);
+  return orders.length ? Math.max(...orders) + 1 : entries.length;
+}
+
+function addSceneControlTool(group, tool) {
+  if (!group) return false;
+  if (!group.tools) group.tools = Array.isArray(group) ? [] : {};
+
+  if (hasSceneControlTool(group.tools, tool.name)) return false;
+
+  if (Array.isArray(group.tools)) {
+    group.tools.push(tool);
+    return true;
+  }
+
+  if (group.tools instanceof Map) {
+    group.tools.set(tool.name, tool);
+    return true;
+  }
+
+  group.tools[tool.name] = tool;
+  return true;
+}
+
 export function addSceneControlButton(controls) {
   const title = game.i18n.localize("MKACTORS.Open");
   const tool = {
     name: "mk-actors",
+    id: "mk-actors",
     title,
     icon: "fas fa-users-viewfinder",
     button: true,
@@ -122,25 +198,17 @@ export function addSceneControlButton(controls) {
     }
   };
 
-  if (Array.isArray(controls)) {
-    const group = controls.find((control) => ["token", "tokens"].includes(control.name)) || controls[0];
-    if (Array.isArray(group?.tools) && !group.tools.some((existing) => existing.name === tool.name)) {
-      group.tools.push(tool);
-      debugLog("Scene control button added", { group: group.name || "" });
-    }
-    return;
+  const group = findSceneControlGroup(controls);
+  tool.order = getNextSceneControlToolOrder(group?.tools);
+  if (addSceneControlTool(group, tool)) {
+    debugLog("Scene control button added", { group: group?.name || group?.id || "" });
   }
+}
 
-  const tokenControls = controls?.tokens || controls?.token;
-  if (!tokenControls?.tools) return;
-
-  if (Array.isArray(tokenControls.tools)) {
-    if (!tokenControls.tools.some((existing) => existing.name === tool.name)) {
-      tokenControls.tools.push(tool);
-      debugLog("Scene control button added", { shape: "array" });
-    }
-  } else if (!tokenControls.tools[tool.name]) {
-    tokenControls.tools[tool.name] = tool;
-    debugLog("Scene control button added", { shape: "object" });
-  }
+export function scheduleGalleryRefresh() {
+  clearTimeout(galleryRefreshTimer);
+  galleryRefreshTimer = setTimeout(() => {
+    galleryRefreshTimer = null;
+    MKActorsApi.refresh({ open: false });
+  }, 100);
 }

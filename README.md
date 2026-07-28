@@ -1,6 +1,6 @@
 # MK Actors
 
-A system-agnostic Foundry VTT module for v12-v13 that gives the GM a searchable visual gallery of Actor documents. You can drag an Actor card onto the active Scene to create a token.
+A system-agnostic Foundry VTT module for v12-v13 that provides a searchable visual gallery of Actor documents. GMs and players can browse Actors they are allowed to see and drag Actor cards onto the active Scene.
 
 ## Compatibility
 
@@ -18,6 +18,9 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Search by name, Actor type, source, or compendium ID.
 - Filter by Actor type.
 - Filter by source from a left tree view with World folders, unfiled World actors, and Actor compendiums.
+- Render large result sets in batches while loading Actor compendium indexes concurrently.
+- Show each Actor as a square 1:1 portrait card with only its name as visible metadata.
+- Keep the gallery's vertical scrollbar visible so card columns do not shift as results change.
 - Drag cards onto a Scene.
 - Drag from an Actor portrait as part of the card.
 - Double-click an Actor card to open its sheet.
@@ -60,10 +63,10 @@ Leave the field empty to include all Actor types.
 
 ## How to open the gallery
 
-You can open it through any of these paths:
+Users can open it through any of these paths:
 
 1. Actors Directory button, when the button is injected successfully.
-2. Scene controls button, when the current Foundry control structure accepts the hook.
+2. Scene controls button on the Token controls.
 3. Configure Settings > Module Settings > MK Actors > Open Actors Gallery.
 4. Keybinding: `Ctrl + Shift + G` by default.
 5. Macro or console:
@@ -91,18 +94,22 @@ Then restart Foundry, enable **MK Actors** in your world, and open the gallery.
 ## Notes
 
 - Dragging a compendium Actor onto a Scene follows Foundry's normal Actor drop behavior.
-- Right-clicking a gallery portrait opens a context menu with a prototype token appearance editor for that Actor. The editor sets the Actor portrait image path, token width, token height, token texture fit mode, anchor, and scale. The prototype token image path is synced from the portrait image automatically.
+- World Actors are shown to non-GM users only when they have at least Limited permission. Compendiums follow Foundry's pack visibility.
+- Right-clicking a gallery portrait, or focusing it and pressing Enter, opens a prototype token appearance editor when the user can update that Actor. The editor validates token dimensions, fit mode, anchor, and scale. The prototype token image path is synced from the portrait image automatically.
+- The gallery cache refreshes after Actor, Actor folder, or compendium changes. The Refresh button remains available for external changes which do not emit a Foundry document hook.
 - The **Sync portrait to token image** setting updates an Actor's prototype token image when that Actor's portrait image changes. It does not rewrite existing Actors until their portraits are changed, and it does not update tokens already placed on Scenes.
 - Enable **Debug mode** in the module settings to log MK Actors settings changes, UI actions, Actor resolution, drag actions, and portrait sync hooks to the browser console with the `MK Actors |` prefix.
 - The module is intentionally conservative: it avoids system-specific stats, CR fields, levels, or NPC sheet assumptions.
 
-## File structure
+## Repository structure
 
 ```text
 mk-actors/
   AGENTS.md
   CHANGELOG.md
+  LICENSE
   module.json
+  package.json
   README.md
   lang/en.json
   scripts/actor-helpers.js
@@ -118,7 +125,20 @@ mk-actors/
   styles/gallery.css
   templates/gallery.hbs
   templates/token-portrait-dialog.hbs
+  tests/module.test.js
 ```
+
+## Development
+
+Run the dependency-free Node test suite with:
+
+```text
+npm test
+```
+
+## License
+
+MK Actors is released under the MIT License. See `LICENSE`.
 
 ## Version history
 

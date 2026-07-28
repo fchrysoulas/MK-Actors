@@ -1,7 +1,8 @@
-import { MODULE_ID } from "./constants.js";
+import { DEFAULT_ACTOR_IMAGE, GALLERY_PAGE_SIZE, MODULE_ID } from "./constants.js";
 import { debugLog } from "./debug.js";
 import { resolveActor } from "./documents.js";
 import {
+  canModifyActor,
   canViewActor,
   getActorImage,
   getUuidForIndex,
@@ -45,6 +46,9 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       type: "",
       source: ""
     };
+    this.visibleLimit = GALLERY_PAGE_SIZE;
+    this.searchRenderTimer = null;
+    this.restoreSearchFocus = false;
   }
 
   get title() {
@@ -66,6 +70,12 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   _onRender(context, options) {
     super._onRender(context, options);
     this.activateListeners(this.element);
+    if (this.restoreSearchFocus) {
+      const input = this.element.querySelector?.("[data-action='search']");
+      input?.focus();
+      input?.setSelectionRange?.(input.value.length, input.value.length);
+      this.restoreSearchFocus = false;
+    }
   }
 
   invalidateCache() {
@@ -78,20 +88,24 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     debugLog("Preparing gallery data", { state: { ...this.filters } });
     const allActors = await this.getActorEntries();
     const filteredByControls = this.filterByControls(allActors);
+    const visibleActors = filteredByControls.slice(0, this.visibleLimit);
     const types = this.getTypeOptions(allActors);
     const sourceTree = this.getSourceTree(allActors);
     const cardSize = Number(game.settings.get(MODULE_ID, "cardSize")) || 150;
     debugLog("Gallery data prepared", {
       totalActors: allActors.length,
-      visibleActors: filteredByControls.length,
+      filteredActors: filteredByControls.length,
+      renderedActors: visibleActors.length,
       types: types.length,
       treeItems: sourceTree.length,
       cardSize
     });
 
     return {
-      actors: filteredByControls,
+      actors: visibleActors,
       hasActors: filteredByControls.length > 0,
+      hasMore: visibleActors.length < filteredByControls.length,
+      resultCount: filteredByControls.length,
       types,
       sourceTree,
       state: this.filters,
@@ -106,12 +120,16 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
     root.querySelector?.("[data-action='search']")?.addEventListener("input", (event) => {
       this.filters.search = event.currentTarget.value || "";
+      this.visibleLimit = GALLERY_PAGE_SIZE;
+      this.restoreSearchFocus = true;
       debugLog("Search filter changed", { search: this.filters.search });
-      this.applySearchFilter(root);
+      clearTimeout(this.searchRenderTimer);
+      this.searchRenderTimer = setTimeout(() => this.render(false), 150);
     });
 
     root.querySelector?.("[data-action='type']")?.addEventListener("change", (event) => {
       this.filters.type = event.currentTarget.value || "";
+      this.visibleLimit = GALLERY_PAGE_SIZE;
       debugLog("Type filter changed", { type: this.filters.type });
       this.render(false);
     });
@@ -119,6 +137,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     for (const button of root.querySelectorAll?.("[data-action='source-tree']") || []) {
       button.addEventListener("click", (event) => {
         this.filters.source = event.currentTarget.dataset.source || "";
+        this.visibleLimit = GALLERY_PAGE_SIZE;
         debugLog("Source tree filter changed", { source: this.filters.source });
         this.render(false);
       });
@@ -128,12 +147,14 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       this.filters.search = "";
       this.filters.type = "";
       this.filters.source = "";
+      this.visibleLimit = GALLERY_PAGE_SIZE;
       debugLog("Gallery filters cleared");
       this.render(false);
     });
 
     root.querySelector?.("[data-action='refresh']")?.addEventListener("click", () => {
       debugLog("Manual gallery refresh requested");
+      this.visibleLimit = GALLERY_PAGE_SIZE;
       this.invalidateCache();
       this.render(false);
     });
@@ -145,13 +166,21 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
     for (const portrait of root.querySelectorAll?.("[data-action='edit-token-portrait']") || []) {
       portrait.addEventListener("contextmenu", this.onPortraitContextMenu.bind(this));
+      portrait.addEventListener("keydown", this.onPortraitKeyDown.bind(this));
+      portrait.addEventListener("error", (event) => {
+        event.currentTarget.src = DEFAULT_ACTOR_IMAGE;
+      }, { once: true });
     }
 
     for (const button of root.querySelectorAll?.("[data-action='open-sheet']") || []) {
       button.addEventListener("click", this.onOpenSheet.bind(this));
     }
 
-    this.applySearchFilter(root);
+    root.querySelector?.("[data-action='load-more']")?.addEventListener("click", () => {
+      this.visibleLimit += GALLERY_PAGE_SIZE;
+      debugLog("Loading more Actor cards", { visibleLimit: this.visibleLimit });
+      this.render(false);
+    });
   }
 
   async getActorEntries() {
@@ -207,7 +236,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
         return {
           id: actor.id,
           uuid: actor.uuid,
-          name: actor.name || "Unnamed Actor",
+          name: actor.name || game.i18n.localize("MKACTORS.UnnamedActor"),
           img: getActorImage(actor),
           type,
           typeLabel: titleCase(type),
@@ -267,23 +296,25 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
   async getCompendiumActorEntries() {
     const onlyVisiblePacks = game.settings.get(MODULE_ID, "showOnlyVisiblePacks");
-    const entries = [];
-
-    for (const pack of game.packs) {
+    const packs = Array.from(game.packs).filter((pack) => {
       const documentName = pack.documentName || pack.metadata?.type;
-      if (documentName !== "Actor") continue;
-      if (onlyVisiblePacks && pack.visible === false) continue;
+      if (documentName !== "Actor") return false;
+      if (pack.visible === false && (onlyVisiblePacks || !game.user?.isGM)) return false;
+      return true;
+    });
 
+    const packEntries = await Promise.all(packs.map(async (pack) => {
       try {
         const index = await pack.getIndex({ fields: ["img", "type", "folder", "prototypeToken.texture.src"] });
         debugLog("Compendium Actor index loaded", { pack: pack.collection, count: index.size ?? index.length ?? 0 });
+        const entries = [];
         for (const entry of index) {
           const type = String(entry.type || "");
           const sourceLabel = pack.metadata?.label || pack.title || pack.collection;
           entries.push({
             id: entry._id,
             uuid: getUuidForIndex(pack, entry),
-            name: entry.name || "Unnamed Actor",
+            name: entry.name || game.i18n.localize("MKACTORS.UnnamedActor"),
             img: getActorImage(entry),
             type,
             typeLabel: titleCase(type),
@@ -294,12 +325,15 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
             searchText: this.buildSearchText(entry.name, type, sourceLabel, pack.collection)
           });
         }
+        return entries;
       } catch (err) {
         debugLog("Compendium Actor index failed", { pack: pack.collection, error: err });
         this.warnings.push({ pack: pack.collection, error: err });
+        return [];
       }
-    }
+    }));
 
+    const entries = packEntries.flat();
     debugLog("Compendium Actor entries loaded", { count: entries.length, onlyVisiblePacks });
     return entries;
   }
@@ -312,9 +346,11 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   }
 
   filterByControls(entries) {
+    const query = String(this.filters.search || "").trim().toLowerCase();
     return entries.filter((entry) => {
       if (this.filters.type && entry.type !== this.filters.type) return false;
       if (this.filters.source && !this.sourceAllowed(entry, this.filters.source)) return false;
+      if (query && !entry.searchText.includes(query)) return false;
       return true;
     });
   }
@@ -470,21 +506,6 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       .toLowerCase();
   }
 
-  applySearchFilter(root) {
-    const query = String(this.filters.search || "").trim().toLowerCase();
-    let visible = 0;
-
-    for (const card of root.querySelectorAll?.(".mk-actors__card") || []) {
-      const matches = !query || card.dataset.search?.includes(query);
-      card.classList.toggle("is-hidden", !matches);
-      if (matches) visible += 1;
-    }
-
-    const count = root.querySelector?.("[data-role='result-count']");
-    if (count) count.textContent = String(visible);
-    debugLog("Search filter applied", { search: query, visible });
-  }
-
   onDragStart(event) {
     const uuid = event.currentTarget.dataset.uuid;
     const dragData = { type: "Actor", uuid };
@@ -518,12 +539,13 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       return;
     }
 
-    await openTokenPortraitDialog(actor, {
-      onUpdated: () => {
-        this.invalidateCache();
-        this.render(true);
-      }
-    });
+    if (!canModifyActor(actor)) {
+      debugLog("Token portrait editor blocked: Actor cannot be modified", { uuid: actor.uuid });
+      ui.notifications.warn(game.i18n.localize("MKACTORS.CannotModifyActor"));
+      return;
+    }
+
+    await openTokenPortraitDialog(actor);
   }
 
   async onCardDoubleClick(event) {
@@ -543,6 +565,15 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     const card = event.currentTarget.closest?.("[data-uuid]");
     debugLog("Portrait context menu requested", { uuid: card?.dataset.uuid });
     this.openPortraitContextMenu(event, card?.dataset.uuid);
+  }
+
+  async onPortraitKeyDown(event) {
+    if (!["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const card = event.currentTarget.closest?.("[data-uuid]");
+    await this.openTokenPortraitEditor(card?.dataset.uuid);
   }
 
   openPortraitContextMenu(event, uuid) {

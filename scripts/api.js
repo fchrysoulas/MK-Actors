@@ -9,16 +9,18 @@ export class MKActorsApi {
     debugLog("Opening gallery");
     if (!this.app) this.app = new MKActorsApp();
     this.app.render(true);
-    debugLog("Gallery render requested", { appId: this.app.appId });
+    debugLog("Gallery render requested", { appId: this.app.id });
     return this.app;
   }
 
-  static refresh() {
-    debugLog("Refreshing gallery");
-    if (!this.app) return this.open();
+  static refresh({ open = true } = {}) {
+    debugLog("Refreshing gallery", { open });
+    if (!this.app) return open ? this.open() : null;
+
     this.app.invalidateCache();
-    this.app.render(true);
-    debugLog("Gallery cache invalidated and render requested", { appId: this.app.appId });
+    const renderRequested = open || this.app.rendered;
+    if (renderRequested) this.app.render(true);
+    debugLog("Gallery cache invalidated", { appId: this.app.id, renderRequested });
     return this.app;
   }
 

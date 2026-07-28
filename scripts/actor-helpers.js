@@ -28,10 +28,20 @@ export function getUuidForIndex(pack, indexEntry) {
 
 export function canViewActor(actor) {
   if (game.user?.isGM) return true;
-  if (!actor?.testUserPermission) return true;
+  if (!actor?.testUserPermission) return false;
   try {
-    return actor.testUserPermission(game.user, "OBSERVER");
+    return actor.testUserPermission(game.user, "LIMITED");
   } catch (_err) {
-    return true;
+    return false;
+  }
+}
+
+export function canModifyActor(actor) {
+  if (game.user?.isGM) return true;
+  try {
+    if (actor?.canUserModify) return actor.canUserModify(game.user, "update");
+    return actor?.isOwner === true;
+  } catch (_err) {
+    return false;
   }
 }
