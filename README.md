@@ -25,7 +25,8 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Drag cards onto a Scene.
 - Drag from an Actor portrait as part of the card.
 - Double-click an Actor card to open its sheet.
-- Right-click an Actor portrait to open a context menu for editing portrait image, token dimensions, fit mode, anchor, and scale.
+- Left-click an Actor portrait to edit its portrait image, token dimensions, fit mode, anchor, and scale in a right-side gallery panel.
+- Keep the selected Actor card at its current scroll position when the right-side editor opens or closes.
 - Open an Actor sheet from the gallery.
 - Configurable included and excluded Actor type IDs.
 - Client-side card size setting.
@@ -96,7 +97,7 @@ Then restart Foundry, enable **MK Actors** in your world, and open the gallery.
 
 - Dragging a compendium Actor onto a Scene follows Foundry's normal Actor drop behavior.
 - World Actors are shown to non-GM users only when they have at least Limited permission. Compendiums follow Foundry's pack visibility.
-- Right-clicking a gallery portrait, or focusing it and pressing Enter, opens a prototype token appearance editor when the user can update that Actor. The editor validates token dimensions, fit mode, anchor, and scale. The prototype token image path is synced from the portrait image automatically.
+- Left-clicking a gallery portrait, or focusing it and pressing Enter, opens the prototype token appearance editor inside the gallery's right side when the user can update that Actor. The editor validates token dimensions, fit mode, anchor, and scale. The prototype token image path is synced from the portrait image automatically.
 - The gallery cache refreshes after Actor, Actor folder, or compendium changes. The Refresh button remains available for external changes which do not emit a Foundry document hook.
 - The **Sync portrait to token image** setting updates an Actor's prototype token image when that Actor's portrait image changes. It does not rewrite existing Actors until their portraits are changed, and it does not update tokens already placed on Scenes.
 - Enable **Debug mode** in the module settings to log MK Actors settings changes, UI actions, Actor resolution, drag actions, and portrait sync hooks to the browser console with the `MK Actors |` prefix.
@@ -122,10 +123,9 @@ mk-actors/
   scripts/hooks.js
   scripts/main.js
   scripts/settings.js
-  scripts/token-portrait-dialog.js
+  scripts/file-picker.js
   styles/gallery.css
   templates/gallery.hbs
-  templates/token-portrait-dialog.hbs
   tests/module.test.js
   docs/UI_STYLE_RULES.md
 ```

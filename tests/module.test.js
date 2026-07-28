@@ -22,10 +22,7 @@ globalThis.game = {
 const { MKActorsApi } = await import("../scripts/api.js");
 const { MKActorsApp } = await import("../scripts/gallery-app.js");
 const { addSceneControlButton } = await import("../scripts/hooks.js");
-const {
-  openTokenPortraitDialog,
-  resolveFilePickerClass
-} = await import("../scripts/token-portrait-dialog.js");
+const { resolveFilePickerClass } = await import("../scripts/file-picker.js");
 
 test("Actor visibility uses LIMITED permission and fails closed", () => {
   let requestedPermission = null;
@@ -96,24 +93,9 @@ test("FilePicker resolution supports v12 globals and v13 namespaced classes", ()
   foundry.applications.apps = priorApps;
 });
 
-test("DialogV2 token editor submits validated normalized updates", async () => {
-  let dialogOptions = null;
+test("inline token editor submits validated normalized updates", async () => {
   let submittedUpdates = null;
-  let closeCount = 0;
-
-  foundry.applications.api.DialogV2 = class {
-    constructor(options) {
-      dialogOptions = options;
-      this.element = {
-        querySelector: () => null
-      };
-    }
-
-    async render() {
-      return this;
-    }
-  };
-  globalThis.renderTemplate = async () => "<div></div>";
+  const priorFromUuid = globalThis.fromUuid;
   globalThis.ui = {
     notifications: {
       info: () => {},
@@ -139,14 +121,13 @@ test("DialogV2 token editor submits validated normalized updates", async () => {
         scaleY: 1
       }
     },
+    documentName: "Actor",
+    isOwner: true,
     update: async (updates) => {
       submittedUpdates = updates;
     }
   };
-
-  await openTokenPortraitDialog(actor);
-  assert.ok(dialogOptions);
-  assert.equal(dialogOptions.form.closeOnSubmit, false);
+  globalThis.fromUuid = async () => actor;
 
   const values = {
     "#mk-portrait-img": "updated.webp",
@@ -161,13 +142,20 @@ test("DialogV2 token editor submits validated normalized updates", async () => {
     reportValidity: () => true,
     querySelector: (selector) => ({ value: values[selector] })
   };
-  const dialogElement = {
-    close: () => { closeCount += 1; }
-  };
+  const app = new MKActorsApp();
+  app.selectedActorUuid = actor.uuid;
+  app.render = async () => app;
 
-  const result = await dialogOptions.buttons[0].callback(null, { form }, dialogElement);
+  const editor = app.buildTokenEditorData(actor);
+  assert.equal(editor.uuid, actor.uuid);
+  assert.equal(editor.name, actor.name);
+  assert.equal(editor.fitOptions.find((option) => option.selected)?.value, "height");
+
+  const result = await app.onTokenEditorSubmit({
+    preventDefault: () => {},
+    currentTarget: form
+  });
   assert.equal(result, true);
-  assert.equal(closeCount, 1);
   assert.deepEqual(submittedUpdates, {
     img: "updated.webp",
     "prototypeToken.width": 1.5,
@@ -178,6 +166,9 @@ test("DialogV2 token editor submits validated normalized updates", async () => {
     "prototypeToken.texture.scaleX": 3,
     "prototypeToken.texture.scaleY": 3
   });
+
+  if (priorFromUuid === undefined) delete globalThis.fromUuid;
+  else globalThis.fromUuid = priorFromUuid;
 });
 
 test("gallery search filters the full cached result set", () => {
@@ -189,6 +180,44 @@ test("gallery search filters the full cached result set", () => {
   ];
 
   assert.deepEqual(app.filterByControls(entries), [entries[0]]);
+});
+
+test("gallery rerenders preserve the selected card's visual scroll position", () => {
+  const app = new MKActorsApp();
+  const originalGrid = {
+    getBoundingClientRect: () => ({ top: 20 })
+  };
+  const originalCard = {
+    dataset: { uuid: "Actor.anchor" },
+    closest: () => originalGrid,
+    getBoundingClientRect: () => ({ top: 85 })
+  };
+
+  const anchor = app.getGridAnchor(originalCard);
+  assert.deepEqual(anchor, { uuid: "Actor.anchor", offset: 65 });
+
+  const renderedGrid = {
+    scrollTop: 100,
+    getBoundingClientRect: () => ({ top: 20 }),
+    querySelectorAll: () => [{
+      dataset: { uuid: "Actor.anchor" },
+      getBoundingClientRect: () => ({ top: 140 })
+    }]
+  };
+  app.pendingGridAnchor = anchor;
+  app.restoreGridAnchor({
+    querySelector: () => renderedGrid
+  });
+
+  assert.equal(renderedGrid.scrollTop, 155);
+  assert.equal(app.pendingGridAnchor, null);
+
+  app.selectedActorUuid = "Actor.anchor";
+  app.element = {
+    querySelector: () => originalCard
+  };
+  app.invalidateCache();
+  assert.deepEqual(app.pendingGridAnchor, anchor);
 });
 
 test("non-GM users cannot index hidden compendiums", async () => {

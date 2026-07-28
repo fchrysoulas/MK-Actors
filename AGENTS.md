@@ -24,10 +24,9 @@ scripts/gallery-app.js   ApplicationV2 gallery implementation
 scripts/hooks.js         Foundry hook callbacks
 scripts/main.js          Module entry point and hook registration
 scripts/settings.js      Settings and keybinding registration
-scripts/token-portrait-dialog.js Prototype token appearance dialog logic
+scripts/file-picker.js   Foundry v12-v13 FilePicker compatibility resolver
 styles/gallery.css       Application styling
 templates/gallery.hbs    Handlebars application template
-templates/token-portrait-dialog.hbs Prototype token appearance dialog template
 docs/UI_STYLE_RULES.md   Reusable ApplicationV2 UI design contract
 ```
 

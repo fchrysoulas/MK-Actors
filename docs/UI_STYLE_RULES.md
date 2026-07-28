@@ -23,8 +23,7 @@ The rules were derived from:
 - Sibling reference `../MK-Parallax-Scenes/scripts/mk-parallax-scenes.js`
   - Stable ApplicationV2 `id` and `classes` used as styling boundaries.
   - Resizable window behavior and a single bounded content shell.
-- `styles/gallery.css`, `templates/gallery.hbs`, and
-  `templates/token-portrait-dialog.hbs`
+- `styles/gallery.css` and `templates/gallery.hbs`
   - Existing MK Actors gallery structure and interaction constraints.
 
 ## Non-Negotiable Product Constraints
@@ -60,9 +59,9 @@ element, or multiple competing accent colors.
 
 ## Canonical Tokens
 
-Define tokens on the ApplicationV2 root so dialogs and gallery components can
-reuse the same vocabulary. Token names may be shortened in implementation, but
-their meaning and values should remain consistent.
+Define tokens on the ApplicationV2 root so gallery components can reuse the
+same vocabulary. Token names may be shortened in implementation, but their
+meaning and values should remain consistent.
 
 ```css
 #mk-actors-app {
@@ -288,9 +287,16 @@ Recommended state behavior:
 - Keep indentation driven by a depth custom property; do not hard-code a
   maximum folder depth.
 
-## Token Portrait Dialog
+## Inline Prototype Token Inspector
 
 - Reuse the same color, border, radius, and control tokens as the gallery.
+- Open the inspector on a portrait left-click and place it at the gallery's
+  right side.
+- Preserve the selected card's visual offset in the grid when the inspector
+  opens, applies changes, or closes; the grid must not jump back to the top.
+- Mark the selected Actor card with a primary border and focus treatment.
+- On narrow windows, present the inspector as a right-edge drawer rather than
+  shrinking the card grid below a usable width.
 - Group related controls on subtle card surfaces rather than adding heavy
   separators.
 - Image path plus Browse remains a flexible text input paired with a square
@@ -386,5 +392,5 @@ Before accepting a UI change, verify:
   missing-image states are visibly distinct.
 - The layout works at wide, medium, and narrow application widths.
 - Text truncates safely without forcing horizontal overflow.
-- The token portrait dialog uses the same visual vocabulary.
+- The inline prototype token inspector uses the same visual vocabulary.
 - No selector leaks into other Foundry applications or game-system sheets.

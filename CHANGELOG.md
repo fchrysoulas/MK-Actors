@@ -10,9 +10,11 @@ This project follows semantic versioning where practical:
 
 ## Unreleased
 
+## 0.3.0 - 2026-07-29
+
 - Added a left source tree that filters by all sources, World folders, unfiled World actors, and Actor compendiums.
 - Simplified Actor cards to square 1:1 portrait previews with name-only metadata.
-- Restyled the gallery and prototype token editor with a card-based dark glassmorphism ApplicationV2 interface.
+- Restyled the gallery and inline prototype token editor with a card-based dark glassmorphism ApplicationV2 interface.
 - Kept the gallery's vertical scrollbar visible to prevent layout shifts between result sets.
 - Improved Actor Directory and Scene Controls button injection across Foundry v12-v13 control layouts, including the ordered v13 tool shape.
 - Kept all gallery launch paths available to non-GM users while filtering world Actors by Foundry visibility permissions.
@@ -20,9 +22,10 @@ This project follows semantic versioning where practical:
 - Prevented settings and document refreshes from opening a closed gallery.
 - Added automatic cache invalidation for Actor, Actor folder, and compendium changes.
 - Loaded compendium indexes concurrently and rendered large Actor result sets in batches.
-- Migrated the prototype token appearance editor to DialogV2 and added validation, bounds, and appropriate rounding for token values.
-- Fixed image browsing in the prototype token appearance editor on Foundry v12 while preserving the v13 FilePicker path.
-- Localized unnamed Actor fallbacks and added accessible labels and keyboard portrait editing.
+- Moved prototype token appearance editing into a validated right-side gallery inspector opened by left-clicking an Actor portrait.
+- Preserved the selected Actor card's visual scroll position when opening, applying, or closing the inline inspector.
+- Fixed image browsing in the inline prototype token editor on Foundry v12 while preserving the v13 FilePicker path.
+- Localized unnamed Actor fallbacks and added accessible labels and keyboard portrait selection.
 - Added the MIT license text and a dependency-free Node test suite.
 
 ## 0.2.1

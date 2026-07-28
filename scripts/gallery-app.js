@@ -9,19 +9,8 @@ import {
   splitSetting,
   titleCase
 } from "./actor-helpers.js";
-import { openTokenPortraitDialog } from "./token-portrait-dialog.js";
-import { localize } from "./utils.js";
-
-let activePortraitContextMenu = null;
-
-function closePortraitContextMenu() {
-  if (activePortraitContextMenu) {
-    activePortraitContextMenu.close();
-    return;
-  }
-
-  document.querySelector(".mk-actors-context-menu")?.remove();
-}
+import { resolveFilePickerClass } from "./file-picker.js";
+import { localize, normalizeNumber } from "./utils.js";
 
 export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -49,6 +38,9 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.visibleLimit = GALLERY_PAGE_SIZE;
     this.searchRenderTimer = null;
     this.restoreSearchFocus = false;
+    this.selectedActorUuid = "";
+    this.portraitClickTimer = null;
+    this.pendingGridAnchor = null;
   }
 
   get title() {
@@ -70,6 +62,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   _onRender(context, options) {
     super._onRender(context, options);
     this.activateListeners(this.element);
+    this.restoreGridAnchor(this.element);
     if (this.restoreSearchFocus) {
       const input = this.element.querySelector?.("[data-action='search']");
       input?.focus();
@@ -80,6 +73,11 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
   invalidateCache() {
     debugLog("Invalidating gallery cache");
+    if (this.selectedActorUuid && !this.pendingGridAnchor) {
+      this.pendingGridAnchor = this.getGridAnchor(
+        this.element?.querySelector?.(".mk-actors__card.is-selected")
+      );
+    }
     this.cache = null;
     this.warnings = [];
   }
@@ -88,10 +86,16 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     debugLog("Preparing gallery data", { state: { ...this.filters } });
     const allActors = await this.getActorEntries();
     const filteredByControls = this.filterByControls(allActors);
-    const visibleActors = filteredByControls.slice(0, this.visibleLimit);
+    const visibleActors = filteredByControls
+      .slice(0, this.visibleLimit)
+      .map((entry) => ({
+        ...entry,
+        selected: entry.uuid === this.selectedActorUuid
+      }));
     const types = this.getTypeOptions(allActors);
     const sourceTree = this.getSourceTree(allActors);
     const cardSize = Number(game.settings.get(MODULE_ID, "cardSize")) || 150;
+    const editor = await this.getSelectedTokenEditorData();
     debugLog("Gallery data prepared", {
       totalActors: allActors.length,
       filteredActors: filteredByControls.length,
@@ -110,7 +114,67 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       sourceTree,
       state: this.filters,
       cardSize,
-      warnings: this.warnings
+      warnings: this.warnings,
+      editor
+    };
+  }
+
+  async getSelectedTokenEditorData() {
+    if (!this.selectedActorUuid) return null;
+
+    const actor = await resolveActor(this.selectedActorUuid);
+    if (!actor || !canModifyActor(actor)) {
+      this.selectedActorUuid = "";
+      return null;
+    }
+
+    return this.buildTokenEditorData(actor);
+  }
+
+  buildTokenEditorData(actor) {
+    const prototypeToken = actor.prototypeToken;
+    const fit = prototypeToken?.texture?.fit || "height";
+    const fits = [
+      ["contain", "FitContain"],
+      ["cover", "FitCover"],
+      ["fill", "FitFill"],
+      ["height", "FitHeight"],
+      ["width", "FitWidth"]
+    ];
+
+    return {
+      uuid: actor.uuid,
+      name: actor.name || localize("UnnamedActor"),
+      portraitImage: actor.img ?? "",
+      width: prototypeToken?.width ?? 1,
+      height: prototypeToken?.height ?? 1,
+      fitOptions: fits.map(([value, label]) => ({
+        value,
+        label: localize(label),
+        selected: value === fit
+      })),
+      anchorX: prototypeToken?.texture?.anchorX ?? 0.5,
+      anchorY: prototypeToken?.texture?.anchorY ?? 0.5,
+      scale: prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
+      labels: {
+        title: localize("TokenPortraitEditorTitle"),
+        close: localize("Close"),
+        imagePath: localize("ImagePath"),
+        browseImage: localize("BrowseImage"),
+        imagePathPortraitNote: localize("ImagePathPortraitNote"),
+        dimensionsGridSpaces: localize("DimensionsGridSpaces"),
+        width: localize("Width"),
+        height: localize("Height"),
+        fitModeHeightNote: localize("FitModeHeightNote"),
+        imageFitMode: localize("ImageFitMode"),
+        imageFitModeHint: localize("ImageFitModeHint"),
+        anchor: localize("Anchor"),
+        x: localize("X"),
+        y: localize("Y"),
+        anchorHint: localize("AnchorHint"),
+        scaleRatio: localize("ScaleRatio"),
+        apply: localize("Apply")
+      }
     };
   }
 
@@ -165,7 +229,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     }
 
     for (const portrait of root.querySelectorAll?.("[data-action='edit-token-portrait']") || []) {
-      portrait.addEventListener("contextmenu", this.onPortraitContextMenu.bind(this));
+      portrait.addEventListener("click", this.onPortraitClick.bind(this));
       portrait.addEventListener("keydown", this.onPortraitKeyDown.bind(this));
       portrait.addEventListener("error", (event) => {
         event.currentTarget.src = DEFAULT_ACTOR_IMAGE;
@@ -181,6 +245,43 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       debugLog("Loading more Actor cards", { visibleLimit: this.visibleLimit });
       this.render(false);
     });
+
+    root.querySelector?.("[data-action='close-token-editor']")?.addEventListener("click", () => {
+      this.pendingGridAnchor = this.getGridAnchor(
+        root.querySelector?.(".mk-actors__card.is-selected")
+      );
+      this.selectedActorUuid = "";
+      debugLog("Inline token portrait editor closed");
+      this.render(false);
+    });
+
+    root.querySelector?.("[data-action='browse-token-image']")?.addEventListener(
+      "click",
+      this.onBrowseTokenImage.bind(this)
+    );
+
+    root.querySelector?.("[data-action='token-editor-form']")?.addEventListener(
+      "submit",
+      this.onTokenEditorSubmit.bind(this)
+    );
+
+    const scaleRange = root.querySelector?.("#mk-token-scale-range");
+    const scaleInput = root.querySelector?.("#mk-token-scale");
+    const portraitInput = root.querySelector?.("#mk-portrait-img");
+    const portraitPreview = root.querySelector?.("[data-role='token-editor-preview']");
+
+    scaleRange?.addEventListener("input", () => {
+      if (scaleInput) scaleInput.value = scaleRange.value;
+    });
+    scaleInput?.addEventListener("input", () => {
+      if (scaleRange) scaleRange.value = scaleInput.value;
+    });
+    portraitInput?.addEventListener("input", () => {
+      if (portraitPreview && portraitInput.value) portraitPreview.src = portraitInput.value;
+    });
+    portraitPreview?.addEventListener("error", (event) => {
+      event.currentTarget.src = DEFAULT_ACTOR_IMAGE;
+    }, { once: true });
   }
 
   async getActorEntries() {
@@ -507,6 +608,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   }
 
   onDragStart(event) {
+    clearTimeout(this.portraitClickTimer);
+    this.portraitClickTimer = null;
     const uuid = event.currentTarget.dataset.uuid;
     const dragData = { type: "Actor", uuid };
     const serialized = JSON.stringify(dragData);
@@ -530,27 +633,58 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     debugLog("Actor sheet render requested", { uuid: actor.uuid, name: actor.name });
   }
 
-  async openTokenPortraitEditor(uuid) {
-    debugLog("Token portrait editor requested", { uuid });
+  getGridAnchor(card) {
+    const grid = card?.closest?.("[data-role='grid']");
+    const uuid = card?.dataset?.uuid;
+    if (!grid || !uuid) return null;
+
+    return {
+      uuid,
+      offset: card.getBoundingClientRect().top - grid.getBoundingClientRect().top
+    };
+  }
+
+  restoreGridAnchor(root) {
+    const anchor = this.pendingGridAnchor;
+    this.pendingGridAnchor = null;
+    if (!anchor) return;
+
+    const grid = root?.querySelector?.("[data-role='grid']");
+    if (!grid) return;
+
+    const card = Array.from(grid.querySelectorAll?.("[data-uuid]") || [])
+      .find((entry) => entry.dataset.uuid === anchor.uuid);
+    if (!card) return;
+
+    const currentOffset = card.getBoundingClientRect().top - grid.getBoundingClientRect().top;
+    grid.scrollTop += currentOffset - anchor.offset;
+  }
+
+  async selectTokenPortraitEditor(uuid, { gridAnchor = null } = {}) {
+    debugLog("Inline token portrait editor requested", { uuid });
     const actor = await resolveActor(uuid);
     if (!actor) {
-      debugLog("Token portrait editor blocked: Actor could not be resolved", { uuid });
+      debugLog("Inline token portrait editor blocked: Actor could not be resolved", { uuid });
       ui.notifications.warn(game.i18n.localize("MKACTORS.CannotResolveActor"));
       return;
     }
 
     if (!canModifyActor(actor)) {
-      debugLog("Token portrait editor blocked: Actor cannot be modified", { uuid: actor.uuid });
+      debugLog("Inline token portrait editor blocked: Actor cannot be modified", { uuid: actor.uuid });
       ui.notifications.warn(game.i18n.localize("MKACTORS.CannotModifyActor"));
       return;
     }
 
-    await openTokenPortraitDialog(actor);
+    this.selectedActorUuid = actor.uuid;
+    this.pendingGridAnchor = gridAnchor;
+    await this.render(false);
   }
 
   async onCardDoubleClick(event) {
     if (event.target.closest?.("button, input, select, textarea, a")) return;
 
+    clearTimeout(this.portraitClickTimer);
+    this.portraitClickTimer = null;
     event.preventDefault();
     event.stopPropagation();
     debugLog("Actor card double-clicked", { uuid: event.currentTarget.dataset.uuid });
@@ -558,13 +692,20 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     await this.openActorSheet(event.currentTarget.dataset.uuid);
   }
 
-  async onPortraitContextMenu(event) {
+  onPortraitClick(event) {
     event.preventDefault();
     event.stopPropagation();
 
     const card = event.currentTarget.closest?.("[data-uuid]");
-    debugLog("Portrait context menu requested", { uuid: card?.dataset.uuid });
-    this.openPortraitContextMenu(event, card?.dataset.uuid);
+    const uuid = card?.dataset.uuid;
+    if (!uuid) return;
+    const gridAnchor = this.getGridAnchor(card);
+
+    clearTimeout(this.portraitClickTimer);
+    this.portraitClickTimer = setTimeout(() => {
+      this.portraitClickTimer = null;
+      this.selectTokenPortraitEditor(uuid, { gridAnchor });
+    }, 300);
   }
 
   async onPortraitKeyDown(event) {
@@ -573,58 +714,120 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     event.stopPropagation();
 
     const card = event.currentTarget.closest?.("[data-uuid]");
-    await this.openTokenPortraitEditor(card?.dataset.uuid);
+    await this.selectTokenPortraitEditor(card?.dataset.uuid, {
+      gridAnchor: this.getGridAnchor(card)
+    });
   }
 
-  openPortraitContextMenu(event, uuid) {
-    if (!uuid) return;
+  async onBrowseTokenImage(event) {
+    event.preventDefault();
+    event.stopPropagation();
 
-    closePortraitContextMenu();
-    debugLog("Opening portrait context menu", { uuid, x: event.clientX, y: event.clientY });
+    const form = event.currentTarget.closest?.("form");
+    const portraitInput = form?.querySelector("#mk-portrait-img");
+    const portraitPreview = form?.querySelector("[data-role='token-editor-preview']");
+    const FilePickerClass = resolveFilePickerClass();
 
-    const menu = document.createElement("nav");
-    menu.className = "mk-actors-context-menu";
-    menu.innerHTML = `
-      <button type="button">
-        <i class="fas fa-image"></i>
-        <span>${localize("EditTokenPortrait")}</span>
-      </button>
-    `;
+    if (!FilePickerClass) {
+      console.error("MK Actors | No compatible Foundry FilePicker constructor is available.");
+      ui.notifications.error(localize("FilePickerUnavailable"));
+      return;
+    }
 
-    const close = () => {
-      menu.remove();
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-      if (activePortraitContextMenu?.menu === menu) activePortraitContextMenu = null;
+    try {
+      const picker = new FilePickerClass({
+        type: "image",
+        current: portraitInput?.value || "",
+        callback: (path) => {
+          if (portraitInput) portraitInput.value = path;
+          if (portraitPreview) portraitPreview.src = path;
+        }
+      });
+      await picker.browse();
+    } catch (err) {
+      console.error(err);
+      ui.notifications.error(game.i18n.format("MKACTORS.FilePickerFailed", {
+        message: err.message ?? err
+      }));
+    }
+  }
+
+  async onTokenEditorSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form?.reportValidity() || !this.selectedActorUuid) return false;
+    const gridAnchor = this.getGridAnchor(
+      this.element?.querySelector?.(".mk-actors__card.is-selected")
+    );
+
+    const actor = await resolveActor(this.selectedActorUuid);
+    if (!actor) {
+      ui.notifications.warn(localize("CannotResolveActor"));
+      this.selectedActorUuid = "";
+      await this.render(false);
+      return false;
+    }
+    if (!canModifyActor(actor)) {
+      ui.notifications.warn(localize("CannotModifyActor"));
+      return false;
+    }
+
+    const prototypeToken = actor.prototypeToken;
+    const currentFit = prototypeToken?.texture?.fit || "height";
+    const portraitImg = String(form.querySelector("#mk-portrait-img")?.value ?? "").trim();
+    const requestedFit = String(form.querySelector("#mk-token-fit")?.value ?? currentFit);
+    const allowedFits = new Set(["contain", "cover", "fill", "height", "width"]);
+
+    if (!portraitImg) {
+      ui.notifications.warn(localize("ImagePathRequired"));
+      return false;
+    }
+
+    const updates = {
+      img: portraitImg,
+      "prototypeToken.width": normalizeNumber(
+        form.querySelector("#mk-token-width")?.value,
+        prototypeToken?.width ?? 1,
+        { min: 0.5, step: 0.5 }
+      ),
+      "prototypeToken.height": normalizeNumber(
+        form.querySelector("#mk-token-height")?.value,
+        prototypeToken?.height ?? 1,
+        { min: 0.5, step: 0.5 }
+      ),
+      "prototypeToken.texture.fit": allowedFits.has(requestedFit) ? requestedFit : "height",
+      "prototypeToken.texture.anchorX": normalizeNumber(
+        form.querySelector("#mk-token-anchor-x")?.value,
+        prototypeToken?.texture?.anchorX ?? 0.5,
+        { min: 0, max: 1 }
+      ),
+      "prototypeToken.texture.anchorY": normalizeNumber(
+        form.querySelector("#mk-token-anchor-y")?.value,
+        prototypeToken?.texture?.anchorY ?? 0.5,
+        { min: 0, max: 1 }
+      ),
+      "prototypeToken.texture.scaleX": normalizeNumber(
+        form.querySelector("#mk-token-scale")?.value,
+        prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
+        { min: 0.2, max: 3, step: 0.05 }
+      )
     };
+    updates["prototypeToken.texture.scaleY"] = updates["prototypeToken.texture.scaleX"];
 
-    const onPointerDown = (pointerEvent) => {
-      if (!menu.contains(pointerEvent.target)) close();
-    };
-
-    const onKeyDown = (keyEvent) => {
-      if (keyEvent.key === "Escape") close();
-    };
-
-    menu.querySelector("button")?.addEventListener("click", async () => {
-      close();
-      debugLog("Portrait context menu action selected", { uuid, action: "edit-token-portrait" });
-      await this.openTokenPortraitEditor(uuid);
-    });
-
-    activePortraitContextMenu = { menu, close };
-    document.body.appendChild(menu);
-
-    const rect = menu.getBoundingClientRect();
-    const left = Math.min(event.clientX, window.innerWidth - rect.width - 8);
-    const top = Math.min(event.clientY, window.innerHeight - rect.height - 8);
-    menu.style.left = `${Math.max(8, left)}px`;
-    menu.style.top = `${Math.max(8, top)}px`;
-
-    setTimeout(() => {
-      document.addEventListener("mousedown", onPointerDown);
-      document.addEventListener("keydown", onKeyDown);
-    }, 0);
+    try {
+      await actor.update(updates, { mkActorsForcePortraitToTokenImage: true });
+      this.invalidateCache();
+      this.pendingGridAnchor = gridAnchor;
+      ui.notifications.info(game.i18n.format("MKACTORS.TokenPortraitUpdated", { name: actor.name }));
+      await this.render(false);
+      return true;
+    } catch (err) {
+      console.error(err);
+      ui.notifications.error(game.i18n.format("MKACTORS.TokenPortraitUpdateFailed", {
+        message: err.message ?? err
+      }));
+      return false;
+    }
   }
 
   async onOpenSheet(event) {
