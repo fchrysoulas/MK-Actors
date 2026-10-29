@@ -527,6 +527,7 @@ New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
 $runtimeFiles = @(
   "README.md",
   "CHANGELOG.md",
+  "THIRD_PARTY_NOTICES.md",
   "LICENSE",
   "LICENSE.md"
 )

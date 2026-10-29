@@ -36,26 +36,6 @@ export function registerSettings() {
     onChange: (value) => refreshAfterSettingChange("includeCompendiumActors", value)
   });
 
-  game.settings.register(MODULE_ID, "actorTypes", {
-    name: game.i18n.localize("MKACTORS.ActorTypes"),
-    hint: game.i18n.localize("MKACTORS.ActorTypesHint"),
-    scope: "world",
-    config: true,
-    type: String,
-    default: "",
-    onChange: (value) => refreshAfterSettingChange("actorTypes", value)
-  });
-
-  game.settings.register(MODULE_ID, "excludedActorTypes", {
-    name: game.i18n.localize("MKACTORS.ExcludedActorTypes"),
-    hint: game.i18n.localize("MKACTORS.ExcludedActorTypesHint"),
-    scope: "world",
-    config: true,
-    type: String,
-    default: "character,pc,player",
-    onChange: (value) => refreshAfterSettingChange("excludedActorTypes", value)
-  });
-
   game.settings.register(MODULE_ID, "showOnlyVisiblePacks", {
     name: game.i18n.localize("MKACTORS.ShowOnlyVisiblePacks"),
     hint: game.i18n.localize("MKACTORS.ShowOnlyVisiblePacksHint"),

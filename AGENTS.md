@@ -25,6 +25,8 @@ scripts/hooks.js         Foundry hook callbacks
 scripts/main.js          Module entry point and hook registration
 scripts/settings.js      Settings and keybinding registration
 scripts/file-picker.js   Foundry v12-v13 FilePicker compatibility resolver
+scripts/token-preview.js Interactive token image preview and fitting geometry
+scripts/window-drag.js  Composited window movement with Foundry position commits
 styles/gallery.css       Application styling
 templates/gallery.hbs    Handlebars application template
 docs/UI_STYLE_RULES.md   Reusable ApplicationV2 UI design contract
@@ -48,7 +50,7 @@ docs/UI_STYLE_RULES.md   Reusable ApplicationV2 UI design contract
 - Actor documents are the only supported document type.
 - The module must remain system agnostic.
 - Actor type filtering should use raw type IDs such as `npc`, `monster`, `creature`, `character`, or `pc`.
-- Default behavior should include all Actor types except common player-character type IDs.
+- Default behavior includes all accessible Actor types, including player-character types. The type selector offers All Types and individual type IDs.
 - Actor placement is handled by Foundry's normal drag-and-drop workflow, not by direct token creation helpers.
 - Non-GM users may browse and drag when permissions allow it.
 
@@ -82,7 +84,8 @@ The repository includes a dependency-free Node test suite. For code changes, do 
 1. Run `npm test`.
 2. Check JSON validity for `module.json` and localization files.
 3. Review JavaScript syntax for obvious parse errors.
-4. If Foundry is available, install or symlink the module into `FoundryVTT/Data/modules/mk-actors`, enable it in a world, and verify:
+4. Always sync the current module files to the local Foundry installation after module changes, even when Foundry is not running. The local test module directory is `C:\Users\flasx\AppData\Local\FoundryVTT\Data\modules\mk-actors` (Foundry application: `E:\Foundry Virtual Tabletop`). Copy `module.json`, `scripts/`, `styles/`, `templates/`, `lang/`, and the module documentation; verify the copied files match the repository. Keep this directory current without asking for confirmation again, and do not modify other modules or world data.
+5. If Foundry is available, enable the updated module in a world and verify:
    - The gallery opens from configured entry points.
    - World Actors and visible Actor compendiums appear.
    - Search, type filter, source filter, clear, and refresh work.

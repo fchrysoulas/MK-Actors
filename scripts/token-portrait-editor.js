@@ -2,7 +2,9 @@ import { DEFAULT_ACTOR_IMAGE, MODULE_ID } from "./constants.js";
 import { canModifyActor } from "./actor-helpers.js";
 import { resolveActor } from "./documents.js";
 import { resolveFilePickerClass } from "./file-picker.js";
+import { TokenImagePreview } from "./token-preview.js";
 import { localize, normalizeNumber } from "./utils.js";
+import { prepareWindowDrag } from "./window-drag.js";
 
 export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -16,6 +18,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
     this.actor = actor;
     this.onApply = onApply;
     this.onClose = onClose;
+    this.preview = null;
   }
 
   get title() {
@@ -31,15 +34,22 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
   }
 
   _replaceHTML(result, content, _options) {
+    this.preview?.destroy();
+    this.preview = null;
     content.innerHTML = result;
   }
 
   _onRender(context, options) {
     super._onRender(context, options);
+    this.windowDrag = prepareWindowDrag(this, this.windowDrag);
     this.activateListeners(this.element);
   }
 
   _onClose(options) {
+    this.windowDrag?.destroy();
+    this.windowDrag = null;
+    this.preview?.destroy();
+    this.preview = null;
     super._onClose(options);
     this.onClose?.();
   }
@@ -59,6 +69,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
       uuid: actor.uuid,
       name: actor.name || localize("UnnamedActor"),
       portraitImage: actor.img ?? "",
+      previewImage: actor.img || DEFAULT_ACTOR_IMAGE,
       width: prototypeToken?.width ?? 1,
       height: prototypeToken?.height ?? 1,
       fitOptions: fits.map(([value, label]) => ({
@@ -71,6 +82,11 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
       scale: prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
       labels: {
         title: localize("TokenPortraitEditorTitle"),
+        preview: localize("TokenPreview"),
+        previewHint: localize("TokenPreviewHint"),
+        previewControls: localize("TokenPreviewControls"),
+        scalePreview: localize("ScaleTokenPreview"),
+        resetPreview: localize("ResetTokenPreview"),
         cancel: localize("Cancel"),
         imagePath: localize("ImagePath"),
         browseImage: localize("BrowseImage"),
@@ -86,7 +102,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
         y: localize("Y"),
         anchorHint: localize("AnchorHint"),
         scaleRatio: localize("ScaleRatio"),
-        apply: localize("Apply")
+        saveAndClose: localize("SaveAndClose")
       }
     };
   }
@@ -116,11 +132,16 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
       if (scaleRange) scaleRange.value = scaleInput.value;
     });
     portraitInput?.addEventListener("input", () => {
-      if (portraitPreview && portraitInput.value) portraitPreview.src = portraitInput.value;
+      if (portraitPreview) portraitPreview.src = portraitInput.value.trim() || DEFAULT_ACTOR_IMAGE;
     });
     portraitPreview?.addEventListener("error", (event) => {
-      event.currentTarget.src = DEFAULT_ACTOR_IMAGE;
-    }, { once: true });
+      if (event.currentTarget.getAttribute("src") !== DEFAULT_ACTOR_IMAGE) {
+        event.currentTarget.src = DEFAULT_ACTOR_IMAGE;
+      }
+    });
+    this.preview?.destroy();
+    const form = root.querySelector?.("[data-action='token-editor-form']");
+    this.preview = form?.querySelector?.("[data-role='token-preview-stage']") ? new TokenImagePreview(form) : null;
   }
 
   async onBrowseTokenImage(event) {
@@ -219,7 +240,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
       this.actor = actor;
       await this.onApply?.();
       ui.notifications.info(game.i18n.format("MKACTORS.TokenPortraitUpdated", { name: actor.name }));
-      await this.render(false);
+      await this.close();
       return true;
     } catch (err) {
       console.error(err);
