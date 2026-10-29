@@ -9,8 +9,8 @@ import {
   splitSetting,
   titleCase
 } from "./actor-helpers.js";
-import { resolveFilePickerClass } from "./file-picker.js";
-import { localize, normalizeNumber } from "./utils.js";
+import { MKTokenPortraitEditor } from "./token-portrait-editor.js";
+import { localize } from "./utils.js";
 
 export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -29,6 +29,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   constructor(options = {}) {
     super(options);
     this.cache = null;
+    this.cacheVersion = 0;
+    this.cacheLoad = null;
     this.warnings = [];
     this.filters = {
       search: "",
@@ -38,8 +40,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.visibleLimit = GALLERY_PAGE_SIZE;
     this.searchRenderTimer = null;
     this.restoreSearchFocus = false;
-    this.selectedActorUuid = "";
-    this.portraitClickTimer = null;
+    this.tokenEditors = new Map();
     this.pendingGridAnchor = null;
   }
 
@@ -73,12 +74,14 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
   invalidateCache() {
     debugLog("Invalidating gallery cache");
-    if (this.selectedActorUuid && !this.pendingGridAnchor) {
+    if (!this.pendingGridAnchor) {
       this.pendingGridAnchor = this.getGridAnchor(
-        this.element?.querySelector?.(".mk-actors__card.is-selected")
+        this.element?.querySelector?.(".mk-actors__card")
       );
     }
     this.cache = null;
+    this.cacheVersion += 1;
+    this.cacheLoad = null;
     this.warnings = [];
   }
 
@@ -86,16 +89,10 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     debugLog("Preparing gallery data", { state: { ...this.filters } });
     const allActors = await this.getActorEntries();
     const filteredByControls = this.filterByControls(allActors);
-    const visibleActors = filteredByControls
-      .slice(0, this.visibleLimit)
-      .map((entry) => ({
-        ...entry,
-        selected: entry.uuid === this.selectedActorUuid
-      }));
+    const visibleActors = filteredByControls.slice(0, this.visibleLimit);
     const types = this.getTypeOptions(allActors);
     const sourceTree = this.getSourceTree(allActors);
     const cardSize = Number(game.settings.get(MODULE_ID, "cardSize")) || 150;
-    const editor = await this.getSelectedTokenEditorData();
     debugLog("Gallery data prepared", {
       totalActors: allActors.length,
       filteredActors: filteredByControls.length,
@@ -114,67 +111,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       sourceTree,
       state: this.filters,
       cardSize,
-      warnings: this.warnings,
-      editor
-    };
-  }
-
-  async getSelectedTokenEditorData() {
-    if (!this.selectedActorUuid) return null;
-
-    const actor = await resolveActor(this.selectedActorUuid);
-    if (!actor || !canModifyActor(actor)) {
-      this.selectedActorUuid = "";
-      return null;
-    }
-
-    return this.buildTokenEditorData(actor);
-  }
-
-  buildTokenEditorData(actor) {
-    const prototypeToken = actor.prototypeToken;
-    const fit = prototypeToken?.texture?.fit || "height";
-    const fits = [
-      ["contain", "FitContain"],
-      ["cover", "FitCover"],
-      ["fill", "FitFill"],
-      ["height", "FitHeight"],
-      ["width", "FitWidth"]
-    ];
-
-    return {
-      uuid: actor.uuid,
-      name: actor.name || localize("UnnamedActor"),
-      portraitImage: actor.img ?? "",
-      width: prototypeToken?.width ?? 1,
-      height: prototypeToken?.height ?? 1,
-      fitOptions: fits.map(([value, label]) => ({
-        value,
-        label: localize(label),
-        selected: value === fit
-      })),
-      anchorX: prototypeToken?.texture?.anchorX ?? 0.5,
-      anchorY: prototypeToken?.texture?.anchorY ?? 0.5,
-      scale: prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
-      labels: {
-        title: localize("TokenPortraitEditorTitle"),
-        close: localize("Close"),
-        imagePath: localize("ImagePath"),
-        browseImage: localize("BrowseImage"),
-        imagePathPortraitNote: localize("ImagePathPortraitNote"),
-        dimensionsGridSpaces: localize("DimensionsGridSpaces"),
-        width: localize("Width"),
-        height: localize("Height"),
-        fitModeHeightNote: localize("FitModeHeightNote"),
-        imageFitMode: localize("ImageFitMode"),
-        imageFitModeHint: localize("ImageFitModeHint"),
-        anchor: localize("Anchor"),
-        x: localize("X"),
-        y: localize("Y"),
-        anchorHint: localize("AnchorHint"),
-        scaleRatio: localize("ScaleRatio"),
-        apply: localize("Apply")
-      }
+      warnings: this.warnings
     };
   }
 
@@ -226,11 +163,10 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     for (const card of root.querySelectorAll?.("[data-action='drag-actor']") || []) {
       card.addEventListener("dragstart", this.onDragStart.bind(this));
       card.addEventListener("dblclick", this.onCardDoubleClick.bind(this));
+      card.addEventListener("contextmenu", this.onCardContextMenu.bind(this));
     }
 
-    for (const portrait of root.querySelectorAll?.("[data-action='edit-token-portrait']") || []) {
-      portrait.addEventListener("click", this.onPortraitClick.bind(this));
-      portrait.addEventListener("keydown", this.onPortraitKeyDown.bind(this));
+    for (const portrait of root.querySelectorAll?.("[data-role='actor-portrait']") || []) {
       portrait.addEventListener("error", (event) => {
         event.currentTarget.src = DEFAULT_ACTOR_IMAGE;
       }, { once: true });
@@ -241,47 +177,12 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     }
 
     root.querySelector?.("[data-action='load-more']")?.addEventListener("click", () => {
+      this.pendingGridAnchor = this.getGridAnchor(root.querySelector?.(".mk-actors__card"));
       this.visibleLimit += GALLERY_PAGE_SIZE;
       debugLog("Loading more Actor cards", { visibleLimit: this.visibleLimit });
       this.render(false);
     });
 
-    root.querySelector?.("[data-action='close-token-editor']")?.addEventListener("click", () => {
-      this.pendingGridAnchor = this.getGridAnchor(
-        root.querySelector?.(".mk-actors__card.is-selected")
-      );
-      this.selectedActorUuid = "";
-      debugLog("Inline token portrait editor closed");
-      this.render(false);
-    });
-
-    root.querySelector?.("[data-action='browse-token-image']")?.addEventListener(
-      "click",
-      this.onBrowseTokenImage.bind(this)
-    );
-
-    root.querySelector?.("[data-action='token-editor-form']")?.addEventListener(
-      "submit",
-      this.onTokenEditorSubmit.bind(this)
-    );
-
-    const scaleRange = root.querySelector?.("#mk-token-scale-range");
-    const scaleInput = root.querySelector?.("#mk-token-scale");
-    const portraitInput = root.querySelector?.("#mk-portrait-img");
-    const portraitPreview = root.querySelector?.("[data-role='token-editor-preview']");
-
-    scaleRange?.addEventListener("input", () => {
-      if (scaleInput) scaleInput.value = scaleRange.value;
-    });
-    scaleInput?.addEventListener("input", () => {
-      if (scaleRange) scaleRange.value = scaleInput.value;
-    });
-    portraitInput?.addEventListener("input", () => {
-      if (portraitPreview && portraitInput.value) portraitPreview.src = portraitInput.value;
-    });
-    portraitPreview?.addEventListener("error", (event) => {
-      event.currentTarget.src = DEFAULT_ACTOR_IMAGE;
-    }, { once: true });
   }
 
   async getActorEntries() {
@@ -289,9 +190,20 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       debugLog("Using cached Actor entries", { count: this.cache.length });
       return this.cache;
     }
+    if (this.cacheLoad) return this.cacheLoad;
 
+    const load = this.loadActorEntries(this.cacheVersion);
+    this.cacheLoad = load;
+    try {
+      return await load;
+    } finally {
+      if (this.cacheLoad === load) this.cacheLoad = null;
+    }
+  }
+
+  async loadActorEntries(cacheVersion) {
     const entries = [];
-    this.warnings = [];
+    const warnings = [];
     debugLog("Loading Actor entries", {
       includeWorldActors: game.settings.get(MODULE_ID, "includeWorldActors"),
       includeCompendiumActors: game.settings.get(MODULE_ID, "includeCompendiumActors")
@@ -302,8 +214,11 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     }
 
     if (game.settings.get(MODULE_ID, "includeCompendiumActors")) {
-      entries.push(...await this.getCompendiumActorEntries());
+      entries.push(...await this.getCompendiumActorEntries(warnings));
     }
+
+    // An invalidated load must not replace newer results or report stale warnings.
+    if (cacheVersion !== this.cacheVersion) return this.getActorEntries();
 
     const includeTypes = splitSetting(game.settings.get(MODULE_ID, "actorTypes"));
     const excludeTypes = splitSetting(game.settings.get(MODULE_ID, "excludedActorTypes"));
@@ -311,6 +226,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.cache = entries
       .filter((entry) => this.typeAllowed(entry.type, includeTypes, excludeTypes))
       .sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
+    this.warnings = warnings;
 
     if (this.warnings.length) {
       ui.notifications.warn(game.i18n.localize("MKACTORS.LoadingFailed"));
@@ -395,7 +311,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     return folder._source?.folder || "";
   }
 
-  async getCompendiumActorEntries() {
+  async getCompendiumActorEntries(warnings = this.warnings) {
     const onlyVisiblePacks = game.settings.get(MODULE_ID, "showOnlyVisiblePacks");
     const packs = Array.from(game.packs).filter((pack) => {
       const documentName = pack.documentName || pack.metadata?.type;
@@ -429,7 +345,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
         return entries;
       } catch (err) {
         debugLog("Compendium Actor index failed", { pack: pack.collection, error: err });
-        this.warnings.push({ pack: pack.collection, error: err });
+        warnings.push({ pack: pack.collection, error: err });
         return [];
       }
     }));
@@ -608,8 +524,6 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   }
 
   onDragStart(event) {
-    clearTimeout(this.portraitClickTimer);
-    this.portraitClickTimer = null;
     const uuid = event.currentTarget.dataset.uuid;
     const dragData = { type: "Actor", uuid };
     const serialized = JSON.stringify(dragData);
@@ -660,31 +574,45 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     grid.scrollTop += currentOffset - anchor.offset;
   }
 
-  async selectTokenPortraitEditor(uuid, { gridAnchor = null } = {}) {
-    debugLog("Inline token portrait editor requested", { uuid });
+  async openTokenPortraitEditor(uuid) {
+    debugLog("Token portrait popup requested", { uuid });
     const actor = await resolveActor(uuid);
     if (!actor) {
-      debugLog("Inline token portrait editor blocked: Actor could not be resolved", { uuid });
-      ui.notifications.warn(game.i18n.localize("MKACTORS.CannotResolveActor"));
+      ui.notifications.warn(localize("CannotResolveActor"));
       return;
     }
-
     if (!canModifyActor(actor)) {
-      debugLog("Inline token portrait editor blocked: Actor cannot be modified", { uuid: actor.uuid });
-      ui.notifications.warn(game.i18n.localize("MKACTORS.CannotModifyActor"));
+      ui.notifications.warn(localize("CannotModifyActor"));
       return;
     }
 
-    this.selectedActorUuid = actor.uuid;
-    this.pendingGridAnchor = gridAnchor;
-    await this.render(false);
+    const existing = this.tokenEditors.get(actor.uuid);
+    if (existing) {
+      await existing.maximize();
+      existing.bringToFront();
+      return existing;
+    }
+
+    const editor = new MKTokenPortraitEditor(actor, {
+      onApply: async () => {
+        this.invalidateCache();
+        if (this.rendered) await this.render(false);
+      },
+      onClose: () => this.tokenEditors.delete(actor.uuid)
+    });
+    this.tokenEditors.set(actor.uuid, editor);
+    try {
+      await editor.render(true);
+      return editor;
+    } catch (error) {
+      this.tokenEditors.delete(actor.uuid);
+      throw error;
+    }
   }
 
   async onCardDoubleClick(event) {
     if (event.target.closest?.("button, input, select, textarea, a")) return;
 
-    clearTimeout(this.portraitClickTimer);
-    this.portraitClickTimer = null;
     event.preventDefault();
     event.stopPropagation();
     debugLog("Actor card double-clicked", { uuid: event.currentTarget.dataset.uuid });
@@ -692,142 +620,10 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     await this.openActorSheet(event.currentTarget.dataset.uuid);
   }
 
-  onPortraitClick(event) {
+  async onCardContextMenu(event) {
     event.preventDefault();
     event.stopPropagation();
-
-    const card = event.currentTarget.closest?.("[data-uuid]");
-    const uuid = card?.dataset.uuid;
-    if (!uuid) return;
-    const gridAnchor = this.getGridAnchor(card);
-
-    clearTimeout(this.portraitClickTimer);
-    this.portraitClickTimer = setTimeout(() => {
-      this.portraitClickTimer = null;
-      this.selectTokenPortraitEditor(uuid, { gridAnchor });
-    }, 300);
-  }
-
-  async onPortraitKeyDown(event) {
-    if (!["Enter", " "].includes(event.key)) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const card = event.currentTarget.closest?.("[data-uuid]");
-    await this.selectTokenPortraitEditor(card?.dataset.uuid, {
-      gridAnchor: this.getGridAnchor(card)
-    });
-  }
-
-  async onBrowseTokenImage(event) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const form = event.currentTarget.closest?.("form");
-    const portraitInput = form?.querySelector("#mk-portrait-img");
-    const portraitPreview = form?.querySelector("[data-role='token-editor-preview']");
-    const FilePickerClass = resolveFilePickerClass();
-
-    if (!FilePickerClass) {
-      console.error("MK Actors | No compatible Foundry FilePicker constructor is available.");
-      ui.notifications.error(localize("FilePickerUnavailable"));
-      return;
-    }
-
-    try {
-      const picker = new FilePickerClass({
-        type: "image",
-        current: portraitInput?.value || "",
-        callback: (path) => {
-          if (portraitInput) portraitInput.value = path;
-          if (portraitPreview) portraitPreview.src = path;
-        }
-      });
-      await picker.browse();
-    } catch (err) {
-      console.error(err);
-      ui.notifications.error(game.i18n.format("MKACTORS.FilePickerFailed", {
-        message: err.message ?? err
-      }));
-    }
-  }
-
-  async onTokenEditorSubmit(event) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    if (!form?.reportValidity() || !this.selectedActorUuid) return false;
-    const gridAnchor = this.getGridAnchor(
-      this.element?.querySelector?.(".mk-actors__card.is-selected")
-    );
-
-    const actor = await resolveActor(this.selectedActorUuid);
-    if (!actor) {
-      ui.notifications.warn(localize("CannotResolveActor"));
-      this.selectedActorUuid = "";
-      await this.render(false);
-      return false;
-    }
-    if (!canModifyActor(actor)) {
-      ui.notifications.warn(localize("CannotModifyActor"));
-      return false;
-    }
-
-    const prototypeToken = actor.prototypeToken;
-    const currentFit = prototypeToken?.texture?.fit || "height";
-    const portraitImg = String(form.querySelector("#mk-portrait-img")?.value ?? "").trim();
-    const requestedFit = String(form.querySelector("#mk-token-fit")?.value ?? currentFit);
-    const allowedFits = new Set(["contain", "cover", "fill", "height", "width"]);
-
-    if (!portraitImg) {
-      ui.notifications.warn(localize("ImagePathRequired"));
-      return false;
-    }
-
-    const updates = {
-      img: portraitImg,
-      "prototypeToken.width": normalizeNumber(
-        form.querySelector("#mk-token-width")?.value,
-        prototypeToken?.width ?? 1,
-        { min: 0.5, step: 0.5 }
-      ),
-      "prototypeToken.height": normalizeNumber(
-        form.querySelector("#mk-token-height")?.value,
-        prototypeToken?.height ?? 1,
-        { min: 0.5, step: 0.5 }
-      ),
-      "prototypeToken.texture.fit": allowedFits.has(requestedFit) ? requestedFit : "height",
-      "prototypeToken.texture.anchorX": normalizeNumber(
-        form.querySelector("#mk-token-anchor-x")?.value,
-        prototypeToken?.texture?.anchorX ?? 0.5,
-        { min: 0, max: 1 }
-      ),
-      "prototypeToken.texture.anchorY": normalizeNumber(
-        form.querySelector("#mk-token-anchor-y")?.value,
-        prototypeToken?.texture?.anchorY ?? 0.5,
-        { min: 0, max: 1 }
-      ),
-      "prototypeToken.texture.scaleX": normalizeNumber(
-        form.querySelector("#mk-token-scale")?.value,
-        prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
-        { min: 0.2, max: 3, step: 0.05 }
-      )
-    };
-    updates["prototypeToken.texture.scaleY"] = updates["prototypeToken.texture.scaleX"];
-
-    try {
-      await actor.update(updates, { mkActorsForcePortraitToTokenImage: true });
-      this.invalidateCache();
-      this.pendingGridAnchor = gridAnchor;
-      ui.notifications.info(game.i18n.format("MKACTORS.TokenPortraitUpdated", { name: actor.name }));
-      await this.render(false);
-      return true;
-    } catch (err) {
-      console.error(err);
-      ui.notifications.error(game.i18n.format("MKACTORS.TokenPortraitUpdateFailed", {
-        message: err.message ?? err
-      }));
-      return false;
-    }
+    await this.openTokenPortraitEditor(event.currentTarget.dataset.uuid);
   }
 
   async onOpenSheet(event) {

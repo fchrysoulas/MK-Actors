@@ -1,0 +1,125 @@
+<section class="mk-actors__inspector" aria-label="{{editor.labels.title}}">
+  <form class="mk-actors__inspector-form" data-action="token-editor-form" data-uuid="{{editor.uuid}}">
+    <div class="mk-actors__inspector-scroll">
+      <div class="mk-actors__inspector-preview">
+        <img src="{{editor.portraitImage}}"
+             alt="{{editor.name}}"
+             data-role="token-editor-preview">
+      </div>
+
+      <div class="mk-actors__inspector-section">
+        <label for="{{id}}-portrait-img">{{editor.labels.imagePath}}</label>
+        <div class="mk-actors-token-editor__row">
+          <input id="{{id}}-portrait-img"
+                 name="portraitImg"
+                 type="text"
+                 value="{{editor.portraitImage}}"
+                 required>
+          <button type="button"
+                  class="mk-actors-token-editor__browse"
+                  data-action="browse-token-image"
+                  title="{{editor.labels.browseImage}}"
+                  aria-label="{{editor.labels.browseImage}}">
+            <i class="fas fa-folder-open"></i>
+          </button>
+        </div>
+        <p class="notes">{{editor.labels.imagePathPortraitNote}}</p>
+      </div>
+
+      <div class="mk-actors__inspector-section">
+        <label>{{editor.labels.dimensionsGridSpaces}}</label>
+        <div class="mk-actors-token-editor__dimensions">
+          <label>
+            <span>{{editor.labels.width}}</span>
+            <input id="{{id}}-token-width"
+                   name="tokenWidth"
+                   type="number"
+                   min="0.5"
+                   step="any"
+                   value="{{editor.width}}"
+                   required>
+          </label>
+          <label>
+            <span>{{editor.labels.height}}</span>
+            <input id="{{id}}-token-height"
+                   name="tokenHeight"
+                   type="number"
+                   min="0.5"
+                   step="any"
+                   value="{{editor.height}}"
+                   required>
+          </label>
+        </div>
+        <p class="notes">{{editor.labels.fitModeHeightNote}}</p>
+      </div>
+
+      <div class="mk-actors__inspector-section">
+        <label for="{{id}}-token-fit">{{editor.labels.imageFitMode}}</label>
+        <select id="{{id}}-token-fit" name="tokenFit">
+          {{#each editor.fitOptions}}
+            <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+        <p class="notes">{{editor.labels.imageFitModeHint}}</p>
+      </div>
+
+      <div class="mk-actors__inspector-section">
+        <label>{{editor.labels.anchor}}</label>
+        <div class="mk-actors-token-editor__dimensions">
+          <label>
+            <span>{{editor.labels.x}}</span>
+            <input id="{{id}}-token-anchor-x"
+                   name="tokenAnchorX"
+                   type="number"
+                   min="0"
+                   max="1"
+                   step="any"
+                   value="{{editor.anchorX}}"
+                   required>
+          </label>
+          <label>
+            <span>{{editor.labels.y}}</span>
+            <input id="{{id}}-token-anchor-y"
+                   name="tokenAnchorY"
+                   type="number"
+                   min="0"
+                   max="1"
+                   step="any"
+                   value="{{editor.anchorY}}"
+                   required>
+          </label>
+        </div>
+        <p class="notes">{{editor.labels.anchorHint}}</p>
+      </div>
+
+      <div class="mk-actors__inspector-section">
+        <label for="{{id}}-token-scale">{{editor.labels.scaleRatio}}</label>
+        <div class="mk-actors-token-editor__scale">
+          <input id="{{id}}-token-scale-range"
+                 name="tokenScaleRange"
+                 type="range"
+                 min="0.2"
+                 max="3"
+                 step="0.05"
+                 value="{{editor.scale}}">
+          <input id="{{id}}-token-scale"
+                 name="tokenScale"
+                 type="number"
+                 min="0.2"
+                 max="3"
+                 step="any"
+                 value="{{editor.scale}}"
+                 required>
+        </div>
+      </div>
+    </div>
+
+    <footer class="mk-actors__inspector-footer">
+      <button type="button" data-action="close-token-editor">{{editor.labels.cancel}}</button>
+      <button type="submit">
+        <i class="fas fa-check"></i>
+        <span>{{editor.labels.apply}}</span>
+      </button>
+    </footer>
+  </form>
+</section>

@@ -287,16 +287,16 @@ Recommended state behavior:
 - Keep indentation driven by a depth custom property; do not hard-code a
   maximum folder depth.
 
-## Inline Prototype Token Inspector
+## Prototype Token Appearance Popup
 
 - Reuse the same color, border, radius, and control tokens as the gallery.
-- Open the inspector on a portrait left-click and place it at the gallery's
-  right side.
-- Preserve the selected card's visual offset in the grid when the inspector
-  opens, applies changes, or closes; the grid must not jump back to the top.
-- Mark the selected Actor card with a primary border and focus treatment.
-- On narrow windows, present the inspector as a right-edge drawer rather than
-  shrinking the card grid below a usable width.
+- Open a separate, movable, resizable ApplicationV2 popup only on an Actor
+  card's context-menu action. Left-clicking must not open the editor.
+- Preserve the gallery's visual scroll position when the popup opens,
+  applies changes, or closes; opening and closing must not rerender the gallery.
+- Reuse the existing popup when the same Actor is right-clicked again.
+- Scope popup tokens and window styling under `.mk-actors-token-editor-app`.
+- Keep the popup's form scrollable at narrow widths and small window heights.
 - Group related controls on subtle card surfaces rather than adding heavy
   separators.
 - Image path plus Browse remains a flexible text input paired with a square
@@ -392,5 +392,5 @@ Before accepting a UI change, verify:
   missing-image states are visibly distinct.
 - The layout works at wide, medium, and narrow application widths.
 - Text truncates safely without forcing horizontal overflow.
-- The inline prototype token inspector uses the same visual vocabulary.
+- The prototype token appearance popup uses the same visual vocabulary.
 - No selector leaks into other Foundry applications or game-system sheets.

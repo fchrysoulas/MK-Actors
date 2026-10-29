@@ -44,7 +44,9 @@ export function syncPortraitToTokenImage(actor, changes, options) {
   });
 }
 
-export async function ensurePortraitSyncedToTokenImage(actor, changes, options) {
+export async function ensurePortraitSyncedToTokenImage(actor, changes, options, userId) {
+  // Update hooks run on every connected client; only the initiator sends a follow-up.
+  if (!userId || userId !== game.user?.id) return;
   if (!shouldSyncPortraitToTokenImage(changes, options)) return;
 
   const portraitImage = actor.img || changes.img;

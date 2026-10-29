@@ -10,6 +10,12 @@ This project follows semantic versioning where practical:
 
 ## Unreleased
 
+- Moved prototype token appearance editing to a separate, resizable popup opened only by right-clicking an Actor card. Repeated right-clicks focus the Actor's existing popup.
+- Prevented in-flight compendium loads from overwriting refreshed gallery results or reporting outdated source warnings, and shared concurrent index requests.
+- Preserved the gallery scroll position when loading more Actor cards.
+- Handled failed Actor lookups without interrupting the gallery render or leaving sheet actions rejected.
+- Restricted portrait-to-token-image sync follow-ups to the user who initiated the Actor update.
+
 ## 0.3.0 - 2026-07-29
 
 - Added a left source tree that filters by all sources, World folders, unfiled World actors, and Actor compendiums.

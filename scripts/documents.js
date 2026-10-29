@@ -2,7 +2,15 @@ import { debugLog } from "./debug.js";
 
 export async function resolveActor(uuid) {
   debugLog("Resolving Actor", { uuid });
-  const document = await fromUuid(uuid);
+  if (typeof uuid !== "string" || !uuid) return null;
+
+  let document;
+  try {
+    document = await fromUuid(uuid);
+  } catch (error) {
+    debugLog("Actor resolution failed", { uuid, error });
+    return null;
+  }
   if (!document) {
     debugLog("Actor resolution failed", { uuid });
     return null;

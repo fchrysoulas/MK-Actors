@@ -7,7 +7,18 @@ import { normalizeNumber } from "../scripts/utils.js";
 globalThis.foundry = {
   applications: {
     api: {
-      ApplicationV2: class {}
+      ApplicationV2: class {
+        constructor(options = {}) { this.id = options.id; }
+        async render() { this.rendered = true; return this; }
+        async maximize() { return this; }
+        bringToFront() {}
+        _onClose() {}
+        async close(options = {}) {
+          this.rendered = false;
+          this._onClose(options);
+          return this;
+        }
+      }
     }
   }
 };
@@ -15,14 +26,59 @@ globalThis.foundry = {
 globalThis.game = {
   user: { isGM: false },
   i18n: {
-    localize: (key) => key
+    localize: (key) => key,
+    format: (key) => key
+  }
+};
+
+globalThis.ui = {
+  notifications: {
+    info: () => {},
+    warn: () => {},
+    error: () => {}
   }
 };
 
 const { MKActorsApi } = await import("../scripts/api.js");
 const { MKActorsApp } = await import("../scripts/gallery-app.js");
-const { addSceneControlButton } = await import("../scripts/hooks.js");
+const { MKTokenPortraitEditor } = await import("../scripts/token-portrait-editor.js");
+const { addSceneControlButton, ensurePortraitSyncedToTokenImage } = await import("../scripts/hooks.js");
+const { resolveActor } = await import("../scripts/documents.js");
 const { resolveFilePickerClass } = await import("../scripts/file-picker.js");
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function mockActorSources(t, getIndex) {
+  const priorSettings = game.settings;
+  const priorPacks = game.packs;
+  game.settings = {
+    get: (_module, key) => ({
+      includeWorldActors: false,
+      includeCompendiumActors: true,
+      actorTypes: "",
+      excludedActorTypes: "",
+      showOnlyVisiblePacks: true
+    })[key]
+  };
+  game.packs = [{
+    documentName: "Actor",
+    visible: true,
+    collection: "test.actors",
+    getIndex
+  }];
+  t.after(() => {
+    game.settings = priorSettings;
+    game.packs = priorPacks;
+  });
+}
 
 test("Actor visibility uses LIMITED permission and fails closed", () => {
   let requestedPermission = null;
@@ -93,17 +149,9 @@ test("FilePicker resolution supports v12 globals and v13 namespaced classes", ()
   foundry.applications.apps = priorApps;
 });
 
-test("inline token editor submits validated normalized updates", async () => {
+test("popup token editor submits validated normalized updates", async () => {
   let submittedUpdates = null;
   const priorFromUuid = globalThis.fromUuid;
-  globalThis.ui = {
-    notifications: {
-      info: () => {},
-      warn: () => {},
-      error: () => {}
-    }
-  };
-  game.i18n.format = (key) => key;
 
   const actor = {
     id: "actor-id",
@@ -130,20 +178,22 @@ test("inline token editor submits validated normalized updates", async () => {
   globalThis.fromUuid = async () => actor;
 
   const values = {
-    "#mk-portrait-img": "updated.webp",
-    "#mk-token-width": "1.26",
-    "#mk-token-height": "0.1",
-    "#mk-token-fit": "cover",
-    "#mk-token-anchor-x": "-1",
-    "#mk-token-anchor-y": "2",
-    "#mk-token-scale": "4"
+    "[name='portraitImg']": "updated.webp",
+    "[name='tokenWidth']": "1.26",
+    "[name='tokenHeight']": "0.1",
+    "[name='tokenFit']": "cover",
+    "[name='tokenAnchorX']": "-1",
+    "[name='tokenAnchorY']": "2",
+    "[name='tokenScale']": "4"
   };
   const form = {
     reportValidity: () => true,
     querySelector: (selector) => ({ value: values[selector] })
   };
-  const app = new MKActorsApp();
-  app.selectedActorUuid = actor.uuid;
+  let galleryRefreshed = false;
+  const app = new MKTokenPortraitEditor(actor, {
+    onApply: () => { galleryRefreshed = true; }
+  });
   app.render = async () => app;
 
   const editor = app.buildTokenEditorData(actor);
@@ -156,6 +206,7 @@ test("inline token editor submits validated normalized updates", async () => {
     currentTarget: form
   });
   assert.equal(result, true);
+  assert.equal(galleryRefreshed, true);
   assert.deepEqual(submittedUpdates, {
     img: "updated.webp",
     "prototypeToken.width": 1.5,
@@ -182,7 +233,7 @@ test("gallery search filters the full cached result set", () => {
   assert.deepEqual(app.filterByControls(entries), [entries[0]]);
 });
 
-test("gallery rerenders preserve the selected card's visual scroll position", () => {
+test("gallery rerenders preserve a card's visual scroll position", () => {
   const app = new MKActorsApp();
   const originalGrid = {
     getBoundingClientRect: () => ({ top: 20 })
@@ -212,7 +263,6 @@ test("gallery rerenders preserve the selected card's visual scroll position", ()
   assert.equal(renderedGrid.scrollTop, 155);
   assert.equal(app.pendingGridAnchor, null);
 
-  app.selectedActorUuid = "Actor.anchor";
   app.element = {
     querySelector: () => originalCard
   };
@@ -243,6 +293,291 @@ test("non-GM users cannot index hidden compendiums", async () => {
 
   game.settings = priorSettings;
   game.packs = priorPacks;
+});
+
+test("concurrent gallery loads share one compendium index request", async (t) => {
+  const index = deferred();
+  let requests = 0;
+  mockActorSources(t, () => {
+    requests += 1;
+    return index.promise;
+  });
+  const app = new MKActorsApp();
+  const firstLoad = app.getActorEntries();
+  const secondLoad = app.getActorEntries();
+  index.resolve([{ _id: "one", name: "First Actor", type: "npc" }]);
+
+  const [first, second] = await Promise.all([firstLoad, secondLoad]);
+  assert.equal(requests, 1);
+  assert.strictEqual(first, second);
+  assert.strictEqual(app.cache, first);
+});
+
+test("refresh during indexing discards an older result that finishes last", async (t) => {
+  const oldIndex = deferred();
+  let requests = 0;
+  mockActorSources(t, () => {
+    requests += 1;
+    return requests === 1 ? oldIndex.promise : [{ _id: "new", name: "New Actor", type: "npc" }];
+  });
+  const app = new MKActorsApp();
+  const oldLoad = app.getActorEntries();
+  app.invalidateCache();
+  const refreshed = await app.getActorEntries();
+  oldIndex.resolve([{ _id: "old", name: "Old Actor", type: "npc" }]);
+
+  const result = await oldLoad;
+  assert.strictEqual(result, refreshed);
+  assert.strictEqual(app.cache, refreshed);
+  assert.equal(app.cache[0].name, "New Actor");
+  assert.equal(requests, 2);
+});
+
+test("refresh during indexing suppresses warnings from the discarded load", async (t) => {
+  const oldIndex = deferred();
+  let requests = 0;
+  let warnings = 0;
+  mockActorSources(t, () => {
+    requests += 1;
+    return requests === 1 ? oldIndex.promise : [{ _id: "new", name: "New Actor", type: "npc" }];
+  });
+  t.mock.method(ui.notifications, "warn", () => { warnings += 1; });
+  t.mock.method(console, "warn", () => {});
+  const app = new MKActorsApp();
+  const oldLoad = app.getActorEntries();
+  app.invalidateCache();
+  const refreshed = await app.getActorEntries();
+  oldIndex.reject(new Error("Old index request failed"));
+
+  assert.strictEqual(await oldLoad, refreshed);
+  assert.deepEqual(app.warnings, []);
+  assert.equal(warnings, 0);
+});
+
+test("an invalidated load waits for the replacement index when it finishes first", async (t) => {
+  const oldIndex = deferred();
+  const newIndex = deferred();
+  let requests = 0;
+  mockActorSources(t, () => {
+    requests += 1;
+    return requests === 1 ? oldIndex.promise : newIndex.promise;
+  });
+  const app = new MKActorsApp();
+  const oldLoad = app.getActorEntries();
+  app.invalidateCache();
+  const newLoad = app.getActorEntries();
+  oldIndex.resolve([{ _id: "old", name: "Old Actor", type: "npc" }]);
+  // Let the old request finish before releasing the replacement index.
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(app.cache, null);
+  newIndex.resolve([{ _id: "new", name: "New Actor", type: "npc" }]);
+
+  const [oldResult, newResult] = await Promise.all([oldLoad, newLoad]);
+  assert.strictEqual(oldResult, newResult);
+  assert.equal(newResult[0].name, "New Actor");
+  assert.equal(requests, 2);
+});
+
+test("a current source failure still warns and refresh can retry it", async (t) => {
+  let requests = 0;
+  let warning = null;
+  mockActorSources(t, async () => {
+    requests += 1;
+    if (requests === 1) throw new Error("Source unavailable");
+    return [{ _id: "one", name: "Recovered Actor", type: "npc" }];
+  });
+  t.mock.method(ui.notifications, "warn", (key) => { warning = key; });
+  t.mock.method(console, "warn", () => {});
+  const app = new MKActorsApp();
+  assert.deepEqual(await app.getActorEntries(), []);
+  assert.equal(app.warnings.length, 1);
+  assert.equal(warning, "MKACTORS.LoadingFailed");
+
+  app.invalidateCache();
+  const entries = await app.getActorEntries();
+  assert.equal(entries[0].name, "Recovered Actor");
+  assert.deepEqual(app.warnings, []);
+  assert.equal(requests, 2);
+});
+
+test("Actor resolution accepts Actors and rejects other documents or invalid input", async (t) => {
+  const priorFromUuid = globalThis.fromUuid;
+  let document = { documentName: "Actor", uuid: "Actor.one" };
+  let lookups = 0;
+  globalThis.fromUuid = async () => {
+    lookups += 1;
+    return document;
+  };
+  t.after(() => {
+    if (priorFromUuid === undefined) delete globalThis.fromUuid;
+    else globalThis.fromUuid = priorFromUuid;
+  });
+
+  assert.strictEqual(await resolveActor(document.uuid), document);
+  document = { documentName: "Item" };
+  assert.equal(await resolveActor("Item.one"), null);
+  document = null;
+  assert.equal(await resolveActor("Actor.missing"), null);
+  for (const uuid of [undefined, null, "", {}]) {
+    assert.equal(await resolveActor(uuid), null);
+  }
+  assert.equal(lookups, 3);
+});
+
+test("failed Actor resolution prevents popup opening and allows sheet actions to finish", async (t) => {
+  const priorFromUuid = globalThis.fromUuid;
+  globalThis.fromUuid = async () => { throw new Error("Compendium is unavailable"); };
+  t.after(() => {
+    if (priorFromUuid === undefined) delete globalThis.fromUuid;
+    else globalThis.fromUuid = priorFromUuid;
+  });
+
+  assert.equal(await resolveActor("Compendium.missing.actors.Actor.one"), null);
+  const app = new MKActorsApp();
+  let warning = null;
+  t.mock.method(ui.notifications, "warn", (key) => { warning = key; });
+  assert.equal(await app.openTokenPortraitEditor("Compendium.missing.actors.Actor.one"), undefined);
+  assert.equal(app.tokenEditors.size, 0);
+  assert.equal(warning, "MKACTORS.CannotResolveActor");
+  await app.openActorSheet("Compendium.missing.actors.Actor.one");
+  assert.equal(warning, "MKACTORS.CannotResolveActor");
+});
+
+test("only a card context menu opens the popup and repeated requests focus it", async (t) => {
+  const priorFromUuid = globalThis.fromUuid;
+  const actor = { uuid: "Actor.one", documentName: "Actor", name: "First Actor", isOwner: true };
+  globalThis.fromUuid = async () => actor;
+  t.after(() => { globalThis.fromUuid = priorFromUuid; });
+  const cardHandlers = new Map();
+  const portraitHandlers = new Map();
+  const card = { dataset: { uuid: actor.uuid }, addEventListener: (type, handler) => cardHandlers.set(type, handler) };
+  const portrait = { addEventListener: (type, handler) => portraitHandlers.set(type, handler) };
+  const app = new MKActorsApp();
+  app.render = () => { throw new Error("Opening a popup must not rerender the gallery"); };
+  app.activateListeners({
+    querySelector: () => null,
+    querySelectorAll: (selector) => {
+      if (selector === "[data-action='drag-actor']") return [card];
+      if (selector === "[data-role='actor-portrait']") return [portrait];
+      return [];
+    }
+  });
+  assert.equal(portraitHandlers.has("click"), false);
+  assert.equal(portraitHandlers.has("keydown"), false);
+  assert.equal(cardHandlers.has("click"), false);
+  const event = {
+    currentTarget: card,
+    preventDefault: t.mock.fn(),
+    stopPropagation: t.mock.fn()
+  };
+  await cardHandlers.get("contextmenu")(event);
+  const editor = app.tokenEditors.get(actor.uuid);
+  assert.ok(editor instanceof MKTokenPortraitEditor);
+  assert.equal(editor.rendered, true);
+  assert.equal(event.preventDefault.mock.callCount(), 1);
+  assert.equal(event.stopPropagation.mock.callCount(), 1);
+  const focus = t.mock.method(editor, "bringToFront");
+  await cardHandlers.get("contextmenu")(event);
+  assert.equal(app.tokenEditors.size, 1);
+  assert.strictEqual(app.tokenEditors.get(actor.uuid), editor);
+  assert.equal(focus.mock.callCount(), 1);
+  await editor.close();
+  assert.equal(app.tokenEditors.size, 0);
+  assert.notStrictEqual(await app.openTokenPortraitEditor(actor.uuid), editor);
+});
+
+test("popup editing checks update permission again and closes if the Actor disappears", async (t) => {
+  const priorFromUuid = globalThis.fromUuid;
+  let actor = { uuid: "Actor.one", documentName: "Actor", isOwner: false };
+  globalThis.fromUuid = async () => actor;
+  t.after(() => { globalThis.fromUuid = priorFromUuid; });
+  let warning;
+  t.mock.method(ui.notifications, "warn", (key) => { warning = key; });
+  const gallery = new MKActorsApp();
+  assert.equal(await gallery.openTokenPortraitEditor(actor.uuid), undefined);
+  assert.equal(warning, "MKACTORS.CannotModifyActor");
+  assert.equal(gallery.tokenEditors.size, 0);
+  actor.isOwner = true;
+  const editor = await gallery.openTokenPortraitEditor(actor.uuid);
+  actor.isOwner = false;
+  const event = { preventDefault: () => {}, currentTarget: { reportValidity: () => true } };
+  assert.equal(await editor.onTokenEditorSubmit(event), false);
+  assert.equal(warning, "MKACTORS.CannotModifyActor");
+  assert.equal(editor.rendered, true);
+  actor = null;
+  assert.equal(await editor.onTokenEditorSubmit(event), false);
+  assert.equal(warning, "MKACTORS.CannotResolveActor");
+  assert.equal(editor.rendered, false);
+  assert.equal(gallery.tokenEditors.size, 0);
+});
+
+test("portrait sync follow-up updates only on the initiating client", async (t) => {
+  const priorUser = game.user;
+  const priorSettings = game.settings;
+  game.user = { id: "initiator", isGM: true };
+  game.settings = { get: (_module, key) => key === "syncPortraitToTokenImage" };
+  t.after(() => {
+    game.user = priorUser;
+    game.settings = priorSettings;
+  });
+  const updates = [];
+  const actor = {
+    id: "one",
+    uuid: "Actor.one",
+    img: "new.webp",
+    prototypeToken: { texture: { src: "old.webp" } },
+    update: async (...args) => { updates.push(args); }
+  };
+  const changes = { img: actor.img };
+
+  await ensurePortraitSyncedToTokenImage(actor, changes, {}, "another-user");
+  assert.equal(updates.length, 0);
+  await ensurePortraitSyncedToTokenImage(actor, changes, {}, game.user.id);
+  assert.deepEqual(updates, [[
+    { "prototypeToken.texture.src": actor.img },
+    { mkActorsSyncPortraitToTokenImage: true }
+  ]]);
+  await ensurePortraitSyncedToTokenImage(actor, changes, { mkActorsSyncPortraitToTokenImage: true }, game.user.id);
+  assert.equal(updates.length, 1);
+});
+
+test("loading more cards preserves the grid scroll position", () => {
+  const app = new MKActorsApp();
+  const grid = { getBoundingClientRect: () => ({ top: 20 }) };
+  const card = {
+    dataset: { uuid: "Actor.one" },
+    closest: () => grid,
+    getBoundingClientRect: () => ({ top: -480 })
+  };
+  let loadMore;
+  const root = {
+    querySelector: (selector) => {
+      if (selector === "[data-action='load-more']") {
+        return { addEventListener: (_event, handler) => { loadMore = handler; } };
+      }
+      if (selector === ".mk-actors__card") return card;
+      return null;
+    },
+    querySelectorAll: () => []
+  };
+  let renders = 0;
+  app.render = () => { renders += 1; };
+  app.activateListeners(root);
+  loadMore();
+
+  assert.equal(app.visibleLimit, 400);
+  assert.equal(renders, 1);
+  assert.deepEqual(app.pendingGridAnchor, { uuid: card.dataset.uuid, offset: -500 });
+  const renderedGrid = {
+    scrollTop: 0,
+    getBoundingClientRect: () => ({ top: 20 }),
+    querySelectorAll: () => [{
+      dataset: card.dataset,
+      getBoundingClientRect: () => ({ top: 20 })
+    }]
+  };
+  app.restoreGridAnchor({ querySelector: () => renderedGrid });
+  assert.equal(renderedGrid.scrollTop, 500);
 });
 
 test("scene control supports the v12 array shape", () => {
