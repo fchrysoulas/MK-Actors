@@ -1,10 +1,27 @@
 <section class="mk-actors__inspector" aria-label="{{editor.labels.title}}">
   <form class="mk-actors__inspector-form" data-action="token-editor-form" data-uuid="{{editor.uuid}}">
     <div class="mk-actors__inspector-scroll">
-      <div class="mk-actors__inspector-preview">
-        <img src="{{editor.portraitImage}}"
-             alt="{{editor.name}}"
-             data-role="token-editor-preview">
+      <div class="mk-actors__inspector-section">
+        <div class="mk-actors-token-editor__preview-heading">
+          <span>{{editor.labels.preview}}</span>
+          <button type="button" class="mk-actors-token-editor__reset"
+                  data-action="reset-token-preview"
+                  title="{{editor.labels.resetPreview}}" aria-label="{{editor.labels.resetPreview}}">
+            <i class="fas fa-rotate-left" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="mk-actors__inspector-preview" data-role="token-preview-stage" tabindex="0" role="group"
+             aria-label="{{editor.labels.previewControls}}" aria-describedby="{{id}}-preview-hint">
+          <img src="{{editor.previewImage}}" alt="{{editor.name}}" draggable="false"
+               data-role="token-editor-preview">
+          <div class="mk-actors-token-editor__token-frame" data-role="token-preview-frame" aria-hidden="true"></div>
+          <button type="button" class="mk-actors-token-editor__scale-handle"
+                  data-action="scale-token-preview"
+                  title="{{editor.labels.scalePreview}}" aria-label="{{editor.labels.scalePreview}}">
+            <i class="fas fa-up-right-and-down-left-from-center" aria-hidden="true"></i>
+          </button>
+        </div>
+        <p id="{{id}}-preview-hint" class="notes">{{editor.labels.previewHint}}</p>
       </div>
 
       <div class="mk-actors__inspector-section">
@@ -118,7 +135,7 @@
       <button type="button" data-action="close-token-editor">{{editor.labels.cancel}}</button>
       <button type="submit">
         <i class="fas fa-check"></i>
-        <span>{{editor.labels.apply}}</span>
+        <span>{{editor.labels.saveAndClose}}</span>
       </button>
     </footer>
   </form>

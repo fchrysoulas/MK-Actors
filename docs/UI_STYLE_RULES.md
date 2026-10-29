@@ -2,7 +2,7 @@
 
 These rules define the visual language for MK Actors. The target is a compact,
 card-based dark glass interface that feels native to a Foundry VTT
-`ApplicationV2`, using MK Parallax Scenes as the local family reference.
+`ApplicationV2`, using MK Scene Gallery as the local family reference.
 
 This is a design contract, not a requirement to copy selectors or markup from
 the reference module. MK Actors remains system agnostic and must preserve its
@@ -12,15 +12,15 @@ gallery behavior.
 
 The rules were derived from:
 
-- Sibling reference `../MK-Parallax-Scenes/styles/mk-parallax-scenes.css`
+- Sibling reference `../MK-Scene-Gallery/styles/gallery.css`
   - Scoped design tokens on the ApplicationV2 root.
   - Layered translucent surfaces and restrained gradients.
   - Compact controls, accent-led state changes, card borders, and shadows.
   - Stable scroll gutters and container-query responsive layouts.
-- Sibling reference `../MK-Parallax-Scenes/templates/parallax-config.hbs`
+- Sibling reference `../MK-Scene-Gallery/templates/gallery.hbs`
   - Shell, command bar, card collection, empty state, and footer structure.
   - Icon-only secondary actions with descriptive `title` attributes.
-- Sibling reference `../MK-Parallax-Scenes/scripts/mk-parallax-scenes.js`
+- Sibling reference `../MK-Scene-Gallery/scripts/app.js`
   - Stable ApplicationV2 `id` and `classes` used as styling boundaries.
   - Resizable window behavior and a single bounded content shell.
 - `styles/gallery.css` and `templates/gallery.hbs`
@@ -49,7 +49,7 @@ The interface should feel:
   and restrained blur.
 - Dense enough for an in-game utility while leaving clear separation between
   controls and cards.
-- Accent-led: blue identifies interactive focus and selection; semantic colors
+- Accent-led: amber identifies interactive focus and selection; semantic colors
   are reserved for success, warning, and destructive states.
 - Layered through tone and elevation, not through heavy outlines or excessive
   decoration.
@@ -66,24 +66,24 @@ meaning and values should remain consistent.
 ```css
 #mk-actors-app {
   /* Color */
-  --mka-bg: rgba(20, 23, 29, 0.90);
-  --mka-surface: rgba(255, 255, 255, 0.055);
-  --mka-surface-strong: rgba(255, 255, 255, 0.085);
+  --mka-bg: #080b12;
+  --mka-surface: rgba(255, 255, 255, 0.035);
+  --mka-surface-strong: rgba(255, 255, 255, 0.075);
   --mka-surface-hover: rgba(255, 255, 255, 0.12);
   --mka-surface-dark: rgba(0, 0, 0, 0.18);
-  --mka-border: rgba(255, 255, 255, 0.14);
-  --mka-border-soft: rgba(255, 255, 255, 0.085);
-  --mka-text: #edf1f5;
-  --mka-text-strong: #f7f9fb;
-  --mka-text-muted: rgba(237, 241, 245, 0.66);
-  --mka-primary: #5c9fe8;
-  --mka-primary-strong: #2f78c8;
+  --mka-border: rgba(255, 255, 255, 0.09);
+  --mka-border-soft: rgba(255, 255, 255, 0.06);
+  --mka-text: #f4f1eb;
+  --mka-text-strong: #f4f1eb;
+  --mka-text-muted: #a6adbb;
+  --mka-primary: #dda85b;
+  --mka-primary-strong: #f1c171;
   --mka-success: #55a46f;
   --mka-warning: #d6a54d;
   --mka-danger: #cf5f58;
 
   /* Shape */
-  --mka-radius-control: 6px;
+  --mka-radius-control: 8px;
   --mka-radius-card: 10px;
   --mka-radius-panel: 12px;
   --mka-radius-pill: 999px;
@@ -131,8 +131,8 @@ Token rules:
   must react to the application window width, not the browser viewport.
 - Use a dark fallback background and layer subtle gradients over it:
   one low-opacity radial accent near the top and one vertical white highlight.
-- If using glass blur, apply it only to bounded surfaces. Provide the
-  translucent background as the fallback:
+- Use translucent surfaces and gradients for the glass effect, with an opaque
+  fallback. Keep backdrop blur off the window and its full content shell:
 
 ```css
 .mk-actors-app .window-content {
@@ -147,16 +147,11 @@ Token rules:
 .mk-actors {
   background:
     radial-gradient(circle at 12% 0%,
-      rgba(92, 159, 232, 0.13), transparent 34%),
+      rgba(86, 115, 178, 0.10), transparent 40%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 32%),
     var(--mka-bg);
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .mk-actors {
-    backdrop-filter: saturate(1.08) blur(10px);
-  }
-}
 ```
 
 ## Surface Hierarchy
@@ -164,8 +159,9 @@ Token rules:
 Use tone, border, and spacing consistently:
 
 1. **Application background** — `--mka-bg` with the subtle shell gradients.
-2. **Toolbar and summary rails** — dark translucent overlays with a bottom
-   border; they remain visually attached to the shell.
+2. **Toolbar, search header, and footer** — dark translucent rails attached to
+   the shell. The search header shows the selected source and its source kind;
+   result counts and warnings stay in the footer.
 3. **Source panel** — `--mka-surface-dark` plus a separating border.
 4. **Cards and form groups** — `--mka-surface`, fine border, inset highlight,
    and card shadow.
@@ -175,14 +171,30 @@ Use tone, border, and spacing consistently:
 Avoid stacking blur on nested surfaces. The glass effect should come primarily
 from transparency, border highlights, and depth.
 
+Keep full-window backdrop blur disabled: the Scene behind the window may be
+animated, and resizing otherwise repeats an expensive background blur. Use
+`content-visibility: auto` on square Actor cards to skip offscreen contents while
+retaining their layout. Isolate each window with layout/paint containment and a
+single compositor hint on the application root, never on every Actor card.
+While the title bar or Foundry resize handle is active, simplify shadows and
+disable hover transitions; restore them as soon as it is released. Do not
+animate the window's `left`, `top`, `width`, or `height` during pointer movement.
+Preserve Foundry's minimize/maximize transitions.
+
+Move expanded windows with a temporary transform, sampling bounds once at the
+start and coalescing pointer updates to animation frames. Commit the final
+position once through Foundry's public `setPosition` API on release. Preserve
+scale, viewport limits, header buttons, double-click minimize, and native
+handling of touch and modified gestures. Escape or lost focus cancels the move.
+Remove pointer listeners and pending frames when an application closes.
+
 ## Typography
 
 - Inherit Foundry's interface font; do not introduce a module-specific web
   font.
 - Body/control text: `0.72rem` to `0.8rem`.
-- Actor names: `0.86rem` to `0.95rem`, weight `700` to `750`, line height
-  `1.1` to `1.2`.
-- Labels and eyebrows: `0.64rem` to `0.68rem`, weight `750` to `800`, modest
+- Actor names: `12px`, weight `550`, line height `1.3`.
+- Labels and eyebrows: `11px` to `12px`, weight `600` to `650`, modest
   letter spacing, uppercase only for compact utility labels.
 - Muted copy uses `--mka-text-muted`; primary content uses `--mka-text`; names
   and headings use `--mka-text-strong`.
@@ -192,14 +204,18 @@ from transparency, border highlights, and depth.
 
 ## Layout and Spacing
 
-- Use CSS grid for the toolbar, source/content split, and actor gallery.
+- Use wrapping flex rows for the toolbar and search header, and CSS grid for
+  the source/content split and actor gallery.
 - Use `minmax(0, 1fr)` for flexible grid tracks so long content cannot force
   horizontal overflow.
 - Keep dense control gaps between `6px` and `10px`.
 - Use `10px` to `12px` padding for major rails and scroll regions.
 - The source panel may use a fixed comfortable width on large windows, but the
   actor grid must own the remaining flexible width.
-- Keep summary/status rows compact, approximately `28px` to `36px` high.
+- Keep the action bar approximately `58px`, Sources/search header `51px` to
+  match MK Scene Gallery, and footer
+  `42px` high. The expanded sidebar is `210px` wide and shares its dividing
+  border directly with the gallery; do not frame it as a detached card.
 - Empty states may be more spacious, but they remain an in-window utility state
   rather than a hero section.
 
@@ -212,13 +228,12 @@ Actor cards are the main visual surface and follow this contract:
   `aspect-ratio: 1 / 1` on an in-flow block. If all visible children are
   absolutely positioned, retain an in-flow square spacer (for example a
   `::before` block with `padding-top: 100%`) so grid rows cannot collapse.
-- Portraits fill the card and use `object-fit: cover`.
+- Portraits sit inside a `6px` inset frame and use `object-fit: contain`.
 - Use `overflow: hidden`, `--mka-radius-card`, a one-pixel border,
   `--mka-shadow-card`, and `--mka-highlight-inset`.
 - Place the actor name in a bottom gradient that becomes opaque enough for
   readable text over any portrait.
-- Reserve the lower-right corner for the Open Sheet action so the name never
-  sits beneath it.
+- Put the Open Sheet action in the top-right corner, away from the name.
 - Do not show type, source, compendium, or system data on the card.
 - Keep the default state quiet. On hover or keyboard focus, brighten the border
   toward `--mka-primary`, slightly strengthen the shadow, and optionally lift
@@ -256,11 +271,13 @@ Recommended state behavior:
 
 ## Controls and Actions
 
-- Inputs and selects use a dark inset surface, one-pixel border, `6px` radius,
-  and a compact height of approximately `30px`.
+- Inputs and selects use a dark surface, one-pixel border, `8px` radius,
+  and a compact height of approximately `34px`.
 - Search retains its leading icon and enough left padding to avoid overlap.
-- Icon-only action buttons are square, visually centered, and at least `30px`
-  in both dimensions. Each has localized `title` and `aria-label` text.
+- Icon-only action buttons are visually centered and normally at least `30px`
+  in both dimensions. The card's Open Sheet button is `26px` and the Sources
+  toggle is `24px`, matching the compact preview. Each has localized `title`
+  and `aria-label` text.
 - Secondary buttons use `--mka-surface-strong`; hover mixes in the primary
   accent.
 - Primary actions may use a vertical primary-to-primary-strong gradient with a
@@ -284,6 +301,18 @@ Recommended state behavior:
 - Count pills use a dark translucent background and subdued border.
 - Long source names truncate with ellipsis and expose their full text through
   `title`.
+- The Sources header includes a toggle for an icon-only sidebar. Keep the
+  selected source visible, expose each source name through `title` and
+  `aria-label`, and preserve filtering and keyboard access in both states.
+- Use a compact 44px collapsed rail, 30px source buttons, and a 24px header
+  toggle. The header toggle is an exception to the usual 30px action size.
+  Do not reserve empty scrollbar gutters in the collapsed rail; let the list
+  show its scrollbar only when it overflows.
+- Collapsing the sidebar updates its layout in place and gives the Actor grid
+  the remaining width. Keep the toggle reachable and the icon rail on the left
+  at narrow window widths.
+- Keep the Sources header outside the scrolling source list so its background
+  spans the full panel width. Reserve the scrollbar gutter on the list only.
 - Keep indentation driven by a depth custom property; do not hard-code a
   maximum folder depth.
 
@@ -293,7 +322,7 @@ Recommended state behavior:
 - Open a separate, movable, resizable ApplicationV2 popup only on an Actor
   card's context-menu action. Left-clicking must not open the editor.
 - Preserve the gallery's visual scroll position when the popup opens,
-  applies changes, or closes; opening and closing must not rerender the gallery.
+  saves changes, or closes; opening and closing must not rerender the gallery.
 - Reuse the existing popup when the same Actor is right-clicked again.
 - Scope popup tokens and window styling under `.mk-actors-token-editor-app`.
 - Keep the popup's form scrollable at narrow widths and small window heights.
@@ -303,6 +332,12 @@ Recommended state behavior:
   icon-only button.
 - Dimension and anchor pairs use equal columns; scale uses a flexible range
   track plus a compact numeric input.
+- The Actor Editor includes an interactive image preview with a visible token
+  footprint. Dragging the image updates its anchors; the corner handle and
+  mouse wheel update its scale. Numeric controls and preview stay in sync.
+- Support arrow keys for positioning, plus/minus for scale, and Escape to
+  cancel a drag. Preview gestures remain unsaved until Save and Close is used.
+  Close the editor after a successful save; keep it open if saving fails.
 - Notes are muted but retain readable contrast and adequate line height.
 - At narrow widths, paired fields stack if their usable input width would fall
   below roughly `120px`.
@@ -356,11 +391,11 @@ Recommended state behavior:
 
 Use container queries because the application is independently resizable:
 
-- **Wide (`> 880px`)** — full toolbar, source sidebar, and responsive card
+- **Wide (`> 730px`)** — full toolbar, source sidebar, and responsive card
   grid.
-- **Medium (`681px` to `880px`)** — tighten gaps, allow filter controls to
-  wrap, and reduce the source panel width before reducing card legibility.
-- **Narrow (`<= 680px`)** — place search on its own row; stack the source panel
+- **Medium (`521px` to `730px`)** — place search on its own row, hide usage
+  hints, and reduce the source panel width to `172px`.
+- **Narrow (`<= 520px`)** — stack the expanded source panel
   above the gallery with a bounded height; keep clear/refresh actions square.
 - Allow the actor grid to reduce column count naturally. Do not distort the
   square card ratio to preserve a column.
@@ -385,7 +420,7 @@ Before accepting a UI change, verify:
 - The shell and each flex/grid ancestor of a scroll region use `min-height: 0`.
 - The grid scrollbar is always visible and its gutter is stable.
 - Card rows have a real in-flow square size and do not collapse.
-- Portraits are cropped, not stretched.
+- Portraits retain their aspect ratio inside the inset frame.
 - Only actor names appear as visible card metadata.
 - Icon-only actions have localized titles and accessible names.
 - Hover, focus-visible, active/drag, selected, disabled, empty, warning, and

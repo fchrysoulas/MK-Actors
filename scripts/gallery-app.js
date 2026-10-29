@@ -6,11 +6,11 @@ import {
   canViewActor,
   getActorImage,
   getUuidForIndex,
-  splitSetting,
   titleCase
 } from "./actor-helpers.js";
 import { MKTokenPortraitEditor } from "./token-portrait-editor.js";
 import { localize } from "./utils.js";
+import { prepareWindowDrag } from "./window-drag.js";
 
 export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -31,6 +31,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.cache = null;
     this.cacheVersion = 0;
     this.cacheLoad = null;
+    this.browseOptions = null;
     this.warnings = [];
     this.filters = {
       search: "",
@@ -42,6 +43,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.restoreSearchFocus = false;
     this.tokenEditors = new Map();
     this.pendingGridAnchor = null;
+    this.sourcesCollapsed = false;
   }
 
   get title() {
@@ -62,6 +64,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
   _onRender(context, options) {
     super._onRender(context, options);
+    this.windowDrag = prepareWindowDrag(this, this.windowDrag);
     this.activateListeners(this.element);
     this.restoreGridAnchor(this.element);
     if (this.restoreSearchFocus) {
@@ -70,6 +73,12 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       input?.setSelectionRange?.(input.value.length, input.value.length);
       this.restoreSearchFocus = false;
     }
+  }
+
+  _onClose(options) {
+    this.windowDrag?.destroy();
+    this.windowDrag = null;
+    super._onClose(options);
   }
 
   invalidateCache() {
@@ -82,6 +91,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.cache = null;
     this.cacheVersion += 1;
     this.cacheLoad = null;
+    this.browseOptions = null;
     this.warnings = [];
   }
 
@@ -90,8 +100,10 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     const allActors = await this.getActorEntries();
     const filteredByControls = this.filterByControls(allActors);
     const visibleActors = filteredByControls.slice(0, this.visibleLimit);
-    const types = this.getTypeOptions(allActors);
-    const sourceTree = this.getSourceTree(allActors);
+    const { types, sourceTree } = this.getBrowseOptions(allActors);
+    const activeSource = sourceTree.find((source) => source.selected) || sourceTree[0];
+    const sourceLocation = localize(!this.filters.source ? "AllActorSources"
+      : this.filters.source.startsWith("compendium:") ? "ActorCompendium" : "WorldActors");
     const cardSize = Number(game.settings.get(MODULE_ID, "cardSize")) || 150;
     debugLog("Gallery data prepared", {
       totalActors: allActors.length,
@@ -109,6 +121,10 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       resultCount: filteredByControls.length,
       types,
       sourceTree,
+      activeSource,
+      sourceLocation,
+      sourcesCollapsed: this.sourcesCollapsed,
+      sourcesToggleLabel: localize(this.sourcesCollapsed ? "ExpandSources" : "CollapseSources"),
       state: this.filters,
       cardSize,
       warnings: this.warnings
@@ -118,6 +134,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   activateListeners(html) {
     const root = html?.[0] || html;
     debugLog("Activating gallery listeners");
+
+    root.querySelector?.("[data-action='toggle-sources']")?.addEventListener("click", () => this.toggleSources(root));
 
     root.querySelector?.("[data-action='search']")?.addEventListener("input", (event) => {
       this.filters.search = event.currentTarget.value || "";
@@ -185,6 +203,19 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
   }
 
+  toggleSources(root) {
+    this.sourcesCollapsed = !this.sourcesCollapsed;
+    root.querySelector?.(".mk-actors__body")?.classList.toggle("is-sources-collapsed", this.sourcesCollapsed);
+    const button = root.querySelector?.("[data-action='toggle-sources']");
+    const label = localize(this.sourcesCollapsed ? "ExpandSources" : "CollapseSources");
+    button?.setAttribute("aria-expanded", String(!this.sourcesCollapsed));
+    button?.setAttribute("aria-label", label);
+    button?.setAttribute("title", label);
+    const icon = button?.querySelector("i");
+    icon?.classList.toggle("fa-chevron-left", !this.sourcesCollapsed);
+    icon?.classList.toggle("fa-chevron-right", this.sourcesCollapsed);
+  }
+
   async getActorEntries() {
     if (this.cache) {
       debugLog("Using cached Actor entries", { count: this.cache.length });
@@ -220,12 +251,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     // An invalidated load must not replace newer results or report stale warnings.
     if (cacheVersion !== this.cacheVersion) return this.getActorEntries();
 
-    const includeTypes = splitSetting(game.settings.get(MODULE_ID, "actorTypes"));
-    const excludeTypes = splitSetting(game.settings.get(MODULE_ID, "excludedActorTypes"));
-
-    this.cache = entries
-      .filter((entry) => this.typeAllowed(entry.type, includeTypes, excludeTypes))
-      .sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
+    this.cache = entries.sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
     this.warnings = warnings;
 
     if (this.warnings.length) {
@@ -235,21 +261,24 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     }
 
     debugLog("Actor entries loaded", {
-      beforeTypeFilter: entries.length,
-      afterTypeFilter: this.cache.length,
-      includeTypes,
-      excludeTypes
+      count: this.cache.length
     });
 
     return this.cache;
   }
 
   getWorldActorEntries() {
+    const folderById = this.getWorldActorFolderMap();
+    const folderPaths = new Map([["", []]]);
+    const sourceLabel = game.i18n.localize("MKACTORS.World");
     const entries = game.actors.contents
       .filter((actor) => canViewActor(actor))
       .map((actor) => {
         const type = String(actor.type || "");
-        const sourceLabel = game.i18n.localize("MKACTORS.World");
+        const folderId = this.getActorFolderId(actor);
+        if (!folderPaths.has(folderId)) {
+          folderPaths.set(folderId, this.getActorFolderPathIds(actor, folderById));
+        }
         return {
           id: actor.id,
           uuid: actor.uuid,
@@ -257,8 +286,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
           img: getActorImage(actor),
           type,
           typeLabel: titleCase(type),
-          folderId: this.getActorFolderId(actor),
-          folderPathIds: this.getActorFolderPathIds(actor),
+          folderId,
+          folderPathIds: folderPaths.get(folderId),
           sourceKind: "world",
           sourceId: "world",
           sourceLabel,
@@ -277,11 +306,11 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     return folder.id || "";
   }
 
-  getActorFolderPathIds(actor) {
+  getActorFolderPathIds(actor, folderById = null) {
     const folderId = this.getActorFolderId(actor);
     if (!folderId) return [];
 
-    const folderById = this.getWorldActorFolderMap();
+    folderById ??= this.getWorldActorFolderMap();
     const pathIds = [];
     let currentId = folderId;
     const seen = new Set();
@@ -355,13 +384,6 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     return entries;
   }
 
-  typeAllowed(type, includeTypes, excludeTypes) {
-    const value = String(type || "").toLowerCase();
-    if (includeTypes.length && !includeTypes.includes(value)) return false;
-    if (excludeTypes.includes(value)) return false;
-    return true;
-  }
-
   filterByControls(entries) {
     const query = String(this.filters.search || "").trim().toLowerCase();
     return entries.filter((entry) => {
@@ -384,6 +406,21 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       return entry.sourceKind === "compendium" && entry.sourceId === sourceId;
     }
     return entry.sourceId === source;
+  }
+
+  getBrowseOptions(entries) {
+    const lang = game.i18n.lang;
+    if (this.browseOptions?.entries !== entries || this.browseOptions.lang !== lang) {
+      this.browseOptions = {
+        entries, lang,
+        types: this.getTypeOptions(entries),
+        sourceTree: this.getSourceTree(entries)
+      };
+    }
+    return {
+      types: this.browseOptions.types.map((option) => ({ ...option, selected: option.value === this.filters.type })),
+      sourceTree: this.browseOptions.sourceTree.map((option) => ({ ...option, selected: option.value === this.filters.source }))
+    };
   }
 
   getTypeOptions(entries) {

@@ -16,20 +16,27 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Browse world Actors.
 - Browse visible Actor compendiums.
 - Search by name, Actor type, source, or compendium ID.
-- Filter by Actor type.
+- Filter by any Actor type found in accessible sources, including player-character types, or select All Types.
 - Filter by source from a left tree view with World folders, unfiled World actors, and Actor compendiums.
+- Collapse the Sources sidebar to a compact icon rail using its small header toggle to give Actor cards more room. Hover over an icon to see the source name. Source filtering and the selected-source highlight remain available, and the sidebar keeps its state while browsing, refreshing, or reopening the gallery during the current session.
+- The compact Sources header aligns with the search header at MK Scene Gallery's height, fills the sidebar width, and stays in place while the source list scrolls.
 - Render large result sets in batches while loading Actor compendium indexes concurrently.
+- Reuse folder paths and type/source options while browsing cached Actors, and batch Actor Editor preview redraws to the display's animation frames.
 - Keep the current gallery scroll position when loading more Actor cards.
 - Show each Actor as a square 1:1 portrait card with only its name as visible metadata.
-- Use a card-based dark glassmorphism interface tailored to Foundry ApplicationV2.
+- Use MK Scene Gallery's dark glass and amber styling, with a joined Sources sidebar, compact action bar, and a search header showing the selected source. Result counts stay in the footer.
+- Show portraits inside inset square frames without stretching or cropping them; Open Sheet sits in each card's top-right corner.
+- Use the same amber controls and token preview styling in Actor Editor.
+- Keep window movement and resizing responsive by isolating each window's rendering, avoiding blur over the Scene, skipping offscreen card painting, and simplifying effects while the title bar or resize handle is held. Window geometry follows the pointer without theme easing.
+- Move the gallery and Actor Editor without recalculating their layout on every drag frame. Their final positions are committed when the title bar is released; Escape cancels a move.
 - Keep the gallery's vertical scrollbar visible so card columns do not shift as results change.
 - Drag cards onto a Scene.
 - Drag from an Actor portrait as part of the card.
 - Double-click an Actor card to open its sheet.
-- Right-click an Actor card to edit its portrait image, token dimensions, fit mode, anchor, and scale in a separate, movable, resizable popup window.
+- Right-click an Actor card to open the **Actor Editor**, a separate, movable, resizable popup for its portrait image, token dimensions, fit mode, anchor, and scale.
+- Position the image visually in the Actor Editor's token preview: drag it to set the anchors, and drag its corner handle or use the mouse wheel to set the scale ratio. Numeric controls stay in sync. Arrow keys move the image; plus and minus adjust scale. Click **Save and Close** to save the changes and close the editor. If saving fails, the editor stays open so you can retry.
 - Keep the gallery at its current scroll position when the editor opens, applies changes, or closes. Left-clicking does not open the editor.
 - Open an Actor sheet from the gallery.
-- Configurable included and excluded Actor type IDs.
 - Client-side card size setting.
 - Client-side debug mode for tracing module actions in the browser console.
 - World setting to sync Actor portrait changes to prototype token images.
@@ -44,25 +51,9 @@ Foundry systems use different Actor type IDs. Examples:
 - `character`
 - `pc`
 
-By default, this module includes all Actor types except common player-character type IDs:
+The gallery opens with **All Types**, showing every accessible Actor type, including player-character types. The type selector lists every type found in enabled world and compendium sources. Select a specific type to show its Actors, or **All Types** to show every type again. Search and source filters still apply, and source settings and permissions are respected.
 
-```text
-character,pc,player
-```
-
-To hard-limit the gallery to a specific system's NPC/monster types, go to:
-
-```text
-Configure Settings > Module Settings > MK Actors > Included actor types
-```
-
-Then enter a comma-separated list such as:
-
-```text
-npc,monster,creature
-```
-
-Leave the field empty to include all Actor types.
+**Clear** restores All Types and clears search and source filters. Actor type filtering is controlled directly by the selector; separate included and excluded type settings are no longer used.
 
 ## How to open the gallery
 
@@ -86,6 +77,16 @@ MKActors.open();
 
 ## Installation
 
+Install or update through Foundry's module installer using this manifest URL:
+
+```text
+https://github.com/fchrysoulas/MK-Actors/releases/latest/download/module.json
+```
+
+Release v0.4.0 supports Foundry VTT v12-v13.
+
+For a manual installation:
+
 Copy the `mk-actors` folder into:
 
 ```text
@@ -98,8 +99,9 @@ Then restart Foundry, enable **MK Actors** in your world, and open the gallery.
 
 - Dragging a compendium Actor onto a Scene follows Foundry's normal Actor drop behavior.
 - World Actors are shown to non-GM users only when they have at least Limited permission. Compendiums follow Foundry's pack visibility.
-- Right-clicking an Actor card opens the prototype token appearance popup when the user can update that Actor. Right-clicking the same Actor again brings its existing popup to the front. The editor validates token dimensions, fit mode, anchor, and scale. The prototype token image path is synced from the portrait image automatically.
+- Right-clicking an Actor card opens the **Actor Editor** when the user can update that Actor. Right-clicking the same Actor again brings its existing popup to the front. The editor validates token dimensions, fit mode, anchor, and scale. The prototype token image path is synced from the portrait image automatically.
 - The gallery cache refreshes after Actor, Actor folder, or compendium changes. The Refresh button remains available for external changes which do not emit a Foundry document hook.
+- Preview anchor and scale fields update immediately during gestures, while visual redraws are batched. Closing the Actor Editor cancels pending preview redraws.
 - Refreshing while compendium indexes are loading discards outdated results and warnings. Concurrent gallery loads share the current index requests.
 - If an Actor source becomes unavailable, sheet and editor actions show a resolution warning. Saving a popup for an unavailable Actor closes it. `MKActors.resolveActor(uuid)` returns `null` when lookup fails.
 - The **Sync portrait to token image** setting updates an Actor's prototype token image when that Actor's portrait image changes. It does not rewrite existing Actors until their portraits are changed, and it does not update tokens already placed on Scenes.
@@ -129,6 +131,8 @@ mk-actors/
   scripts/settings.js
   scripts/file-picker.js
   scripts/token-portrait-editor.js
+  scripts/token-preview.js
+  scripts/window-drag.js
   styles/gallery.css
   templates/gallery.hbs
   templates/token-portrait-editor.hbs

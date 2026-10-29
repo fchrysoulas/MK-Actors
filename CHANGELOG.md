@@ -8,13 +8,21 @@ This project follows semantic versioning where practical:
 - `MINOR` versions add backwards-compatible features.
 - `PATCH` versions fix bugs or polish existing behavior.
 
-## Unreleased
+## 0.4.0 - 2026-10-29
 
+- Restyled the gallery and Actor Editor to match MK Scene Gallery's compact dark surfaces and amber controls, including aligned Sources and search headers.
+- Added a compact Sources icon rail with a smaller collapse button, accessible source labels, and preserved filtering and session state.
+- Included all accessible Actor types by default, including player-character types, and removed the separate included/excluded type settings. The selector offers All Types and every available raw type ID.
+- Renamed the appearance popup to Actor Editor and added an interactive token preview. Drag the image to set its anchors, and use the corner handle, mouse wheel, or keyboard to adjust scale.
+- Replaced Apply with Save and Close, which closes the editor after a successful update and keeps it open when an update fails.
+- Reduced browsing and preview work by caching folder paths and filter options and batching visual preview updates to animation frames.
+- Improved resizing and window movement by avoiding full-window blur and geometry easing, skipping offscreen card painting, and committing title-bar movement once on release. Escape cancels a move, and native header controls and minimize/restore remain available.
 - Moved prototype token appearance editing to a separate, resizable popup opened only by right-clicking an Actor card. Repeated right-clicks focus the Actor's existing popup.
 - Prevented in-flight compendium loads from overwriting refreshed gallery results or reporting outdated source warnings, and shared concurrent index requests.
 - Preserved the gallery scroll position when loading more Actor cards.
 - Handled failed Actor lookups without interrupting the gallery render or leaving sheet actions rejected.
 - Restricted portrait-to-token-image sync follow-ups to the user who initiated the Actor update.
+- Included third-party notices in the Foundry release archive.
 
 ## 0.3.0 - 2026-07-29
 

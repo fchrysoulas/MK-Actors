@@ -1,42 +1,47 @@
 <section class="mk-actors" style="--mk-card-min: {{cardSize}}px;">
   <header class="mk-actors__toolbar">
-    <div class="mk-actors__search-wrap">
-      <i class="fas fa-search"></i>
-      <input type="search" name="search" value="{{state.search}}" placeholder="{{localize 'MKACTORS.Search'}}" autocomplete="off" data-action="search">
+    <div class="mk-actors__toolbar-controls">
+      <div class="mk-actors__toolbar-actions">
+        <button type="button" data-action="clear" title="{{localize 'MKACTORS.Clear'}}" aria-label="{{localize 'MKACTORS.Clear'}}">
+          <i class="fas fa-eraser" aria-hidden="true"></i>
+        </button>
+        <button type="button" data-action="refresh" title="{{localize 'MKACTORS.Refresh'}}" aria-label="{{localize 'MKACTORS.Refresh'}}">
+          <i class="fas fa-sync-alt" aria-hidden="true"></i>
+        </button>
+      </div>
+      <span class="mk-actors__toolbar-divider" aria-hidden="true"></span>
+      <label class="mk-actors__filter">
+        <i class="fas fa-filter" aria-hidden="true"></i>
+        <span class="mk-actors__sr-only">{{localize 'MKACTORS.Type'}}</span>
+        <select name="type" data-action="type">
+          {{#each types}}
+            <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </label>
     </div>
-
-    <label class="mk-actors__filter">
-      <span>{{localize 'MKACTORS.Type'}}</span>
-      <select name="type" data-action="type">
-        {{#each types}}
-          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
-        {{/each}}
-      </select>
-    </label>
-
-    <div class="mk-actors__toolbar-actions">
-      <button type="button" data-action="clear" title="{{localize 'MKACTORS.Clear'}}" aria-label="{{localize 'MKACTORS.Clear'}}">
-        <i class="fas fa-eraser"></i>
-      </button>
-
-      <button type="button" data-action="refresh" title="{{localize 'MKACTORS.Refresh'}}" aria-label="{{localize 'MKACTORS.Refresh'}}">
-        <i class="fas fa-sync-alt"></i>
-      </button>
-    </div>
+    <span class="mk-actors__toolbar-hint"><i class="fas fa-arrow-pointer" aria-hidden="true"></i>{{localize 'MKACTORS.GalleryDragHint'}}</span>
   </header>
 
-  <div class="mk-actors__body">
+  <div class="mk-actors__body {{#if sourcesCollapsed}}is-sources-collapsed{{/if}}">
     <aside class="mk-actors__sources" aria-label="{{localize 'MKACTORS.SourcesTree'}}">
-      <div class="mk-actors__sources-title">{{localize 'MKACTORS.SourcesTree'}}</div>
-      <nav class="mk-actors__source-tree">
+      <div class="mk-actors__sources-title">
+        <span>{{localize 'MKACTORS.SourcesTree'}}</span>
+        <button type="button" class="mk-actors__sources-toggle" data-action="toggle-sources"
+                title="{{sourcesToggleLabel}}" aria-label="{{sourcesToggleLabel}}"
+                aria-expanded="{{#if sourcesCollapsed}}false{{else}}true{{/if}}" aria-controls="mk-actors-source-tree">
+          <i class="fas {{#if sourcesCollapsed}}fa-chevron-right{{else}}fa-chevron-left{{/if}}" aria-hidden="true"></i>
+        </button>
+      </div>
+      <nav id="mk-actors-source-tree" class="mk-actors__source-tree">
         {{#each sourceTree}}
           <button type="button"
                   class="{{#if selected}}is-selected{{/if}}"
                   data-action="source-tree"
                   data-source="{{value}}"
                   style="--mk-tree-depth: {{depth}};"
-                  title="{{label}}">
-            <i class="{{icon}}"></i>
+                  title="{{label}}" aria-label="{{label}}" aria-pressed="{{#if selected}}true{{else}}false{{/if}}">
+            <i class="{{icon}}" aria-hidden="true"></i>
             <span>{{label}}</span>
             <em>{{count}}</em>
           </button>
@@ -45,22 +50,19 @@
     </aside>
 
     <main class="mk-actors__main">
-      <div class="mk-actors__summary" aria-live="polite">
-        <span class="mk-actors__summary-chip">
-          <i class="fas fa-users" aria-hidden="true"></i>
-          <span>{{localize 'MKACTORS.Showing'}}</span>
-          <strong>{{actors.length}}</strong>
-          <span>{{localize 'MKACTORS.Of'}}</span>
-          <strong data-role="result-count">{{resultCount}}</strong>
-          <span>{{localize 'MKACTORS.ActorsCountLabel'}}</span>
-        </span>
-        {{#if warnings}}
-          <span class="mk-actors__warning">
-            <i class="fas fa-triangle-exclamation"></i>
-            <strong>{{warnings.length}}</strong>
-            <span>{{localize 'MKACTORS.SourceWarnings'}}</span>
-          </span>
-        {{/if}}
+      <div class="mk-actors__content-header">
+        <div class="mk-actors__location">
+          <div class="mk-actors__location-title">
+            <i class="{{activeSource.icon}}" aria-hidden="true"></i>
+            <h2 title="{{activeSource.label}}">{{activeSource.label}}</h2>
+          </div>
+          <span class="mk-actors__location-path">{{sourceLocation}}</span>
+        </div>
+        <label class="mk-actors__search-wrap">
+          <i class="fas fa-search" aria-hidden="true"></i>
+          <span class="mk-actors__sr-only">{{localize 'MKACTORS.Search'}}</span>
+          <input type="search" name="search" value="{{state.search}}" placeholder="{{localize 'MKACTORS.Search'}}" autocomplete="off" data-action="search">
+        </label>
       </div>
 
       {{#if hasActors}}
@@ -111,6 +113,24 @@
           <p>{{localize 'MKACTORS.NoActors'}}</p>
         </div>
       {{/if}}
+      <footer class="mk-actors__summary">
+        <span class="mk-actors__result-count" aria-live="polite">
+          <span>{{localize 'MKACTORS.Showing'}}</span>
+          <strong>{{actors.length}}</strong>
+          <span>{{localize 'MKACTORS.Of'}}</span>
+          <strong data-role="result-count">{{resultCount}}</strong>
+          <span>{{localize 'MKACTORS.ActorsCountLabel'}}</span>
+        </span>
+        {{#if warnings}}
+          <span class="mk-actors__warning" role="status">
+            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+            <strong>{{warnings.length}}</strong>
+            <span>{{localize 'MKACTORS.SourceWarnings'}}</span>
+          </span>
+        {{else}}
+          <span class="mk-actors__editor-hint">{{localize 'MKACTORS.GalleryEditorHint'}}</span>
+        {{/if}}
+      </footer>
     </main>
 
   </div>
