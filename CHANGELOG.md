@@ -8,6 +8,16 @@ This project follows semantic versioning where practical:
 - `MINOR` versions add backwards-compatible features.
 - `PATCH` versions fix bugs or polish existing behavior.
 
+## Unreleased
+
+## 0.5.0 - 2026-11-11
+
+- Replaced the local PowerShell release script with a GitHub Actions workflow that validates, packages, and publishes version tags, with manual draft publishing available.
+- Restricted Foundry VTT compatibility to v13-v14 only.
+- Added a Name field to Actor Editor that updates the Actor and prototype token names together on Save and Close.
+- Added a star button to Actor cards and a Favorites group in Sources, matching MK Scene Gallery. Favorites persist on the current client, work with search and type filters, and remain available in the collapsed Sources rail.
+- Fixed the manifest license link to point to the bundled license file.
+
 ## 0.4.0 - 2026-10-29
 
 - Restyled the gallery and Actor Editor to match MK Scene Gallery's compact dark surfaces and amber controls, including aligned Sources and search headers.

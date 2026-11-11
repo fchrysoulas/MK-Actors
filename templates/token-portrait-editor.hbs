@@ -2,6 +2,18 @@
   <form class="mk-actors__inspector-form" data-action="token-editor-form" data-uuid="{{editor.uuid}}">
     <div class="mk-actors__inspector-scroll">
       <div class="mk-actors__inspector-section">
+        <label for="{{id}}-actor-name">{{editor.labels.name}}</label>
+        <input id="{{id}}-actor-name"
+               name="actorName"
+               type="text"
+               value="{{editor.actorName}}"
+               autocomplete="off"
+               aria-describedby="{{id}}-actor-name-hint"
+               required>
+        <p id="{{id}}-actor-name-hint" class="notes">{{editor.labels.nameHint}}</p>
+      </div>
+
+      <div class="mk-actors__inspector-section">
         <div class="mk-actors-token-editor__preview-heading">
           <span>{{editor.labels.preview}}</span>
           <button type="button" class="mk-actors-token-editor__reset"

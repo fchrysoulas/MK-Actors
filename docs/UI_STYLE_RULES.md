@@ -234,6 +234,9 @@ Actor cards are the main visual surface and follow this contract:
 - Place the actor name in a bottom gradient that becomes opaque enough for
   readable text over any portrait.
 - Put the Open Sheet action in the top-right corner, away from the name.
+- Put an always-visible Favorites star in the top-left corner. Use an outlined
+  star when unselected and a filled amber star when selected; expose its toggle
+  state and localized action through accessible labels and `aria-pressed`.
 - Do not show type, source, compendium, or system data on the card.
 - Keep the default state quiet. On hover or keyboard focus, brighten the border
   toward `--mka-primary`, slightly strengthen the shadow, and optionally lift
@@ -293,6 +296,10 @@ Recommended state behavior:
 
 ## Source Tree and Selection
 
+- Include a Favorites row with a star and a count of accessible starred Actors.
+  Favorites use the same source selection and collapsed icon rail as other rows,
+  and combine with search and type filters. Store Actor UUIDs in a hidden client
+  setting so favorites do not alter Actor documents or other clients' choices.
 - Source rows are transparent by default and become a light glass surface on
   hover.
 - The selected source uses a primary-tinted background and primary-mixed
@@ -328,6 +335,8 @@ Recommended state behavior:
 - Keep the popup's form scrollable at narrow widths and small window heights.
 - Group related controls on subtle card surfaces rather than adding heavy
   separators.
+- Put a required Name field above the token preview. Save it to the Actor name
+  and prototype token name together; reject blank or whitespace-only names.
 - Image path plus Browse remains a flexible text input paired with a square
   icon-only button.
 - Dimension and anchor pairs use equal columns; scale uses a flexible range
@@ -341,7 +350,7 @@ Recommended state behavior:
 - Notes are muted but retain readable contrast and adequate line height.
 - At narrow widths, paired fields stack if their usable input width would fall
   below roughly `120px`.
-- Native validity, labels, keyboard access, and Foundry v12-v13 behavior take
+- Native validity, labels, keyboard access, and Foundry v13-v14 behavior take
   priority over visual styling.
 
 ## Scrollbars

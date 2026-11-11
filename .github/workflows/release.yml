@@ -1,0 +1,85 @@
+name: Publish Foundry module
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish (for example, v0.5.0)
+        required: true
+        type: string
+      draft:
+        description: Create a draft release for review
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the version tag
+        uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Run tests
+        run: npm test
+
+      - name: Check JavaScript syntax
+        run: |
+          Get-ChildItem scripts, tools -File -Recurse | Where-Object { $_.Extension -in '.js', '.mjs' } | ForEach-Object {
+            node --check $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Syntax check failed: $($_.Name)" }
+          }
+
+      - name: Validate and prepare release files
+        id: prepare
+        run: node tools/prepare-release.mjs "$env:RELEASE_TAG" "$env:GITHUB_REPOSITORY"
+
+      - name: Build Foundry archive
+        env:
+          MODULE_ID: ${{ steps.prepare.outputs.id }}
+        run: Compress-Archive -Path dist/package/* -DestinationPath "dist/$env:MODULE_ID.zip"
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          MODULE_ID: ${{ steps.prepare.outputs.id }}
+          PRERELEASE: ${{ steps.prepare.outputs.prerelease }}
+          DRAFT: ${{ inputs.draft || false }}
+        run: |
+          $releaseArgs = @(
+            'release', 'create', $env:RELEASE_TAG,
+            'dist/module.json', "dist/$env:MODULE_ID.zip",
+            '--verify-tag', '--title', $env:RELEASE_TAG,
+            '--notes-file', 'dist/release-notes.md'
+          )
+          if ($env:PRERELEASE -eq 'true') { $releaseArgs += '--prerelease' }
+          if ($env:DRAFT -eq 'true') { $releaseArgs += '--draft' }
+          gh @releaseArgs
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release publishing failed.' }

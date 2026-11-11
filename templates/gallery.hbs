@@ -87,6 +87,12 @@
               <div class="mk-actors__content">
                 <h3>{{name}}</h3>
               </div>
+              <button type="button" class="mk-actors__favorite {{#if favorite}}is-favorite{{/if}}"
+                      data-action="toggle-favorite" data-uuid="{{uuid}}"
+                      title="{{favoriteLabel}}" aria-label="{{favoriteLabel}}: {{name}}"
+                      aria-pressed="{{#if favorite}}true{{else}}false{{/if}}">
+                <i class="{{#if favorite}}fas{{else}}far{{/if}} fa-star" aria-hidden="true"></i>
+              </button>
               <div class="mk-actors__actions">
                 <button type="button"
                         data-action="open-sheet"
@@ -110,7 +116,7 @@
       {{else}}
         <div class="mk-actors__empty">
           <span class="mk-actors__empty-icon"><i class="fas fa-users-slash"></i></span>
-          <p>{{localize 'MKACTORS.NoActors'}}</p>
+          <p>{{emptyMessage}}</p>
         </div>
       {{/if}}
       <footer class="mk-actors__summary">

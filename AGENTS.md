@@ -4,7 +4,7 @@ Shared instructions for AI agents working on this repository.
 
 ## Project
 
-MK Actors is a system-agnostic Foundry VTT module for Foundry v12-v13. It provides a searchable visual gallery of Foundry `Actor` documents from the world and visible Actor compendiums. Users can drag Actor cards onto the active Scene using Foundry's standard Actor drag data.
+MK Actors is a system-agnostic Foundry VTT module for Foundry v13-v14. It provides a searchable visual gallery of Foundry `Actor` documents from the world and visible Actor compendiums. Users can drag Actor cards onto the active Scene using Foundry's standard Actor drag data.
 
 Keep the module independent of any specific game system. Do not add assumptions for Shadowdark, D&D5e, PF2e, or any other system unless the requested change explicitly introduces optional system-specific behavior.
 
@@ -24,7 +24,7 @@ scripts/gallery-app.js   ApplicationV2 gallery implementation
 scripts/hooks.js         Foundry hook callbacks
 scripts/main.js          Module entry point and hook registration
 scripts/settings.js      Settings and keybinding registration
-scripts/file-picker.js   Foundry v12-v13 FilePicker compatibility resolver
+scripts/file-picker.js   Foundry FilePicker compatibility resolver
 scripts/token-preview.js Interactive token image preview and fitting geometry
 scripts/window-drag.js  Composited window movement with Foundry position commits
 styles/gallery.css       Application styling
@@ -34,8 +34,8 @@ docs/UI_STYLE_RULES.md   Reusable ApplicationV2 UI design contract
 
 ## Foundry Compatibility
 
-- Preserve support for Foundry VTT v12-v13 unless the user explicitly changes the compatibility target.
-- Prefer defensive code around Foundry APIs that changed between v12 and v13.
+- Preserve support for Foundry VTT v13-v14 only unless the user explicitly changes the compatibility target.
+- Prefer defensive code around Foundry APIs that changed between v13 and v14.
 - Keep drag data compatible with Foundry's standard Actor shape:
 
 ```js

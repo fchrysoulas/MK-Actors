@@ -44,6 +44,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.tokenEditors = new Map();
     this.pendingGridAnchor = null;
     this.sourcesCollapsed = false;
+    this.favoriteActors = this.readFavorites();
+    this.savingFavorite = false;
   }
 
   get title() {
@@ -97,13 +99,20 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
   async getData(_options = {}) {
     debugLog("Preparing gallery data", { state: { ...this.filters } });
+    this.favoriteActors = this.readFavorites();
     const allActors = await this.getActorEntries();
     const filteredByControls = this.filterByControls(allActors);
-    const visibleActors = filteredByControls.slice(0, this.visibleLimit);
+    const visibleActors = filteredByControls.slice(0, this.visibleLimit).map((entry) => {
+      const favorite = this.favoriteActors.has(entry.uuid);
+      return { ...entry, favorite, favoriteLabel: localize(favorite ? "RemoveFavorite" : "AddFavorite") };
+    });
     const { types, sourceTree } = this.getBrowseOptions(allActors);
     const activeSource = sourceTree.find((source) => source.selected) || sourceTree[0];
-    const sourceLocation = localize(!this.filters.source ? "AllActorSources"
+    const sourceLocation = localize(this.filters.source === "favorites" ? "FavoriteActorsLocation"
+      : !this.filters.source ? "AllActorSources"
       : this.filters.source.startsWith("compendium:") ? "ActorCompendium" : "WorldActors");
+    const emptyFavorites = this.filters.source === "favorites"
+      && sourceTree.find((source) => source.value === "favorites").count === 0;
     const cardSize = Number(game.settings.get(MODULE_ID, "cardSize")) || 150;
     debugLog("Gallery data prepared", {
       totalActors: allActors.length,
@@ -127,7 +136,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       sourcesToggleLabel: localize(this.sourcesCollapsed ? "ExpandSources" : "CollapseSources"),
       state: this.filters,
       cardSize,
-      warnings: this.warnings
+      warnings: this.warnings,
+      emptyMessage: localize(emptyFavorites ? "NoFavorites" : "NoActors")
     };
   }
 
@@ -194,6 +204,10 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       button.addEventListener("click", this.onOpenSheet.bind(this));
     }
 
+    for (const button of root.querySelectorAll?.("[data-action='toggle-favorite']") || []) {
+      button.addEventListener("click", this.onToggleFavorite.bind(this));
+    }
+
     root.querySelector?.("[data-action='load-more']")?.addEventListener("click", () => {
       this.pendingGridAnchor = this.getGridAnchor(root.querySelector?.(".mk-actors__card"));
       this.visibleLimit += GALLERY_PAGE_SIZE;
@@ -214,6 +228,49 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     const icon = button?.querySelector("i");
     icon?.classList.toggle("fa-chevron-left", !this.sourcesCollapsed);
     icon?.classList.toggle("fa-chevron-right", this.sourcesCollapsed);
+  }
+
+  readFavorites() {
+    const saved = game.settings?.get?.(MODULE_ID, "favoriteActors");
+    return new Set(Array.isArray(saved) ? saved.filter((uuid) => typeof uuid === "string" && uuid.length) : []);
+  }
+
+  async onToggleFavorite(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const button = event.currentTarget;
+    const uuid = button.dataset.uuid;
+    if (!uuid || this.savingFavorite) return;
+
+    this.savingFavorite = true;
+    button.disabled = true;
+    const favorites = this.readFavorites();
+    if (favorites.has(uuid)) favorites.delete(uuid);
+    else favorites.add(uuid);
+
+    try {
+      await game.settings.set(MODULE_ID, "favoriteActors", Array.from(favorites));
+      this.favoriteActors = favorites;
+      const restoreFocus = button.ownerDocument?.activeElement === button;
+      const root = this.element?.[0] || this.element;
+      const card = button.closest?.(".mk-actors__card");
+      this.pendingGridAnchor = this.getGridAnchor(card?.isConnected === false
+        ? root?.querySelector?.(".mk-actors__card") : card);
+      await this.render(false);
+      if (restoreFocus) {
+        const renderedRoot = this.element?.[0] || this.element;
+        const focusButton = Array.from(renderedRoot?.querySelectorAll?.("[data-action='toggle-favorite']") || [])
+          .find((entry) => entry.dataset.uuid === uuid)
+          || renderedRoot?.querySelector?.("[data-source='favorites']");
+        focusButton?.focus({ preventScroll: true });
+      }
+    } catch (error) {
+      console.error(`${MODULE_ID} | Could not update favorite Actors`, error);
+      ui.notifications.error(localize("FavoritesUpdateFailed"));
+    } finally {
+      this.savingFavorite = false;
+      button.disabled = false;
+    }
   }
 
   async getActorEntries() {
@@ -395,6 +452,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   }
 
   sourceAllowed(entry, source) {
+    if (source === "favorites") return this.favoriteActors.has(entry.uuid);
     if (source === "world") return entry.sourceKind === "world";
     if (source === "world-unfiled") return entry.sourceKind === "world" && !entry.folderId;
     if (source.startsWith("world-folder:")) {
@@ -419,7 +477,12 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     }
     return {
       types: this.browseOptions.types.map((option) => ({ ...option, selected: option.value === this.filters.type })),
-      sourceTree: this.browseOptions.sourceTree.map((option) => ({ ...option, selected: option.value === this.filters.source }))
+      sourceTree: this.browseOptions.sourceTree.map((option) => ({
+        ...option,
+        count: option.value === "favorites"
+          ? entries.reduce((count, entry) => count + Number(this.favoriteActors.has(entry.uuid)), 0) : option.count,
+        selected: option.value === this.filters.source
+      }))
     };
   }
 
@@ -453,6 +516,14 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
         count: entries.length,
         depth: 0,
         selected: selected === ""
+      },
+      {
+        value: "favorites",
+        label: localize("Favorites"),
+        icon: "fas fa-star",
+        count: entries.filter((entry) => this.favoriteActors.has(entry.uuid)).length,
+        depth: 0,
+        selected: selected === "favorites"
       }
     ];
 
@@ -591,7 +662,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
     return {
       uuid,
-      offset: card.getBoundingClientRect().top - grid.getBoundingClientRect().top
+      offset: card.getBoundingClientRect().top - grid.getBoundingClientRect().top,
+      scrollTop: grid.scrollTop ?? 0
     };
   }
 
@@ -605,7 +677,10 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
     const card = Array.from(grid.querySelectorAll?.("[data-uuid]") || [])
       .find((entry) => entry.dataset.uuid === anchor.uuid);
-    if (!card) return;
+    if (!card) {
+      if (Number.isFinite(anchor.scrollTop)) grid.scrollTop = anchor.scrollTop;
+      return;
+    }
 
     const currentOffset = card.getBoundingClientRect().top - grid.getBoundingClientRect().top;
     grid.scrollTop += currentOffset - anchor.offset;
@@ -658,6 +733,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   }
 
   async onCardContextMenu(event) {
+    if (event.target?.closest?.("[data-action='toggle-favorite']")) return;
     event.preventDefault();
     event.stopPropagation();
     await this.openTokenPortraitEditor(event.currentTarget.dataset.uuid);

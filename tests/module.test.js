@@ -424,7 +424,7 @@ test("FilePicker resolution supports v12 globals and v13 namespaced classes", ()
   foundry.applications.apps = priorApps;
 });
 
-test("Save and Close waits for validated Actor updates before closing the editor", async (t) => {
+test("Save and Close saves both names and appearance before closing the editor", async (t) => {
   let submittedUpdates = null;
   const priorFromUuid = globalThis.fromUuid;
   const updateStarted = deferred();
@@ -437,6 +437,7 @@ test("Save and Close waits for validated Actor updates before closing the editor
     name: "Test Actor",
     img: "portrait.webp",
     prototypeToken: {
+      name: "Different Token Name",
       width: 1,
       height: 1,
       texture: {
@@ -458,6 +459,7 @@ test("Save and Close waits for validated Actor updates before closing the editor
   globalThis.fromUuid = async () => actor;
 
   const values = {
+    "[name='actorName']": "  Captain Rowan  ",
     "[name='portraitImg']": "updated.webp",
     "[name='tokenWidth']": "1.26",
     "[name='tokenHeight']": "0.1",
@@ -484,6 +486,7 @@ test("Save and Close waits for validated Actor updates before closing the editor
   const editor = app.buildTokenEditorData(actor);
   assert.equal(editor.uuid, actor.uuid);
   assert.equal(editor.name, actor.name);
+  assert.equal(editor.actorName, actor.name);
   assert.equal(editor.fitOptions.find((option) => option.selected)?.value, "height");
 
   const submission = app.onTokenEditorSubmit({
@@ -501,6 +504,8 @@ test("Save and Close waits for validated Actor updates before closing the editor
   assert.equal(editorClosed, true);
   assert.equal(app.rendered, false);
   assert.deepEqual(submittedUpdates, {
+    name: "Captain Rowan",
+    "prototypeToken.name": "Captain Rowan",
     img: "updated.webp",
     "prototypeToken.width": 1.5,
     "prototypeToken.height": 0.5,
@@ -542,6 +547,33 @@ test("Save and Close keeps the editor open when the Actor update fails", async (
   assert.equal(errorNotification.mock.callCount(), 1);
 });
 
+test("Actor Editor rejects whitespace-only names without saving or closing", async (t) => {
+  const priorFromUuid = globalThis.fromUuid;
+  t.after(() => { globalThis.fromUuid = priorFromUuid; });
+  const actor = {
+    uuid: "Actor.name-validation", name: "Original Actor", documentName: "Actor", isOwner: true,
+    prototypeToken: { name: "Original Token", texture: {} },
+    update: t.mock.fn()
+  };
+  globalThis.fromUuid = async () => actor;
+  const warning = t.mock.method(ui.notifications, "warn");
+  const onClose = t.mock.fn();
+  const app = new MKTokenPortraitEditor(actor, { onClose });
+  app.rendered = true;
+  const form = {
+    reportValidity: () => true,
+    querySelector: (selector) => ({ value: selector === "[name='actorName']" ? " \t " : "portrait.webp" })
+  };
+
+  assert.equal(await app.onTokenEditorSubmit({ preventDefault() {}, currentTarget: form }), false);
+  assert.equal(actor.update.mock.callCount(), 0);
+  assert.equal(actor.name, "Original Actor");
+  assert.equal(actor.prototypeToken.name, "Original Token");
+  assert.equal(app.rendered, true);
+  assert.equal(onClose.mock.callCount(), 0);
+  assert.equal(warning.mock.calls[0].arguments[0], "MKACTORS.ActorNameRequired");
+});
+
 test("gallery search filters the full cached result set", () => {
   const app = new MKActorsApp();
   app.filters.search = "red dragon";
@@ -551,6 +583,110 @@ test("gallery search filters the full cached result set", () => {
   ];
 
   assert.deepEqual(app.filterByControls(entries), [entries[0]]);
+});
+
+test("Favorites combine accessible world and compendium Actors with search and type filters", async (t) => {
+  let indexRequests = 0;
+  const preferences = {
+    includeWorldActors: true,
+    favoriteActors: ["Actor.hero", "Actor.hidden", "Compendium.test.actors.Actor.griffin", "Actor.missing"]
+  };
+  mockActorSources(t, async () => {
+    indexRequests += 1;
+    return [
+      { _id: "griffin", uuid: "Compendium.test.actors.Actor.griffin", name: "Griffin", type: "npc" },
+      { _id: "guard", name: "Guard", type: "npc" }
+    ];
+  }, preferences);
+  const priorActors = game.actors;
+  game.actors = { contents: [
+    { id: "hero", uuid: "Actor.hero", name: "Hero", type: "character", testUserPermission: () => true },
+    { id: "hidden", uuid: "Actor.hidden", name: "Secret", type: "npc", testUserPermission: () => false }
+  ] };
+  t.after(() => { game.actors = priorActors; });
+  const app = new MKActorsApp();
+  const sourceBuilds = t.mock.method(app, "getSourceTree");
+  let data = await app.getData();
+  assert.equal(data.sourceTree.find((source) => source.value === "favorites").count, 2);
+  assert.equal(data.actors.filter((actor) => actor.favorite).length, 2);
+  app.filters.source = "favorites";
+  data = await app.getData();
+  assert.deepEqual(data.actors.map((actor) => actor.name), ["Griffin", "Hero"]);
+  assert.equal(data.activeSource.value, "favorites");
+  assert.equal(data.sourceLocation, "MKACTORS.FavoriteActorsLocation");
+  app.filters.type = "character";
+  assert.deepEqual((await app.getData()).actors.map((actor) => actor.uuid), ["Actor.hero"]);
+  app.filters.type = "";
+  app.filters.search = "griffin";
+  assert.deepEqual((await app.getData()).actors.map((actor) => actor.uuid), ["Compendium.test.actors.Actor.griffin"]);
+  assert.equal(sourceBuilds.mock.callCount(), 1);
+  assert.equal(indexRequests, 1);
+});
+
+test("card stars persist Favorites and update counts without reloading Actor indexes", async (t) => {
+  const preferences = { favoriteActors: [] };
+  let indexRequests = 0;
+  mockActorSources(t, async () => {
+    indexRequests += 1;
+    return [{ _id: "one", name: "Guard", type: "npc" }];
+  }, preferences);
+  game.settings.set = t.mock.fn(async (module, key, value) => {
+    assert.equal(module, "mk-actors");
+    assert.equal(key, "favoriteActors");
+    preferences.favoriteActors = value;
+  });
+  const app = new MKActorsApp();
+  const render = t.mock.method(app, "render");
+  const sourceBuilds = t.mock.method(app, "getSourceTree");
+  const initial = await app.getData();
+  const uuid = initial.actors[0].uuid;
+  const event = {
+    currentTarget: { dataset: { uuid } },
+    preventDefault: t.mock.fn(), stopPropagation: t.mock.fn()
+  };
+  await app.onToggleFavorite(event);
+  assert.deepEqual(preferences.favoriteActors, [uuid]);
+  assert.equal(event.preventDefault.mock.callCount(), 1);
+  assert.equal(event.stopPropagation.mock.callCount(), 1);
+  assert.equal(render.mock.callCount(), 1);
+  assert.equal((await app.getData()).actors[0].favorite, true);
+  assert.equal((await app.getData()).sourceTree.find((source) => source.value === "favorites").count, 1);
+  assert.equal(new MKActorsApp().favoriteActors.has(uuid), true);
+
+  app.filters.source = "favorites";
+  await app.onToggleFavorite(event);
+  const empty = await app.getData();
+  assert.deepEqual(preferences.favoriteActors, []);
+  assert.equal(empty.resultCount, 0);
+  assert.equal(empty.activeSource.value, "favorites");
+  assert.equal(empty.sourceTree.find((source) => source.value === "favorites").count, 0);
+  assert.equal(empty.emptyMessage, "MKACTORS.NoFavorites");
+  assert.equal(sourceBuilds.mock.callCount(), 1);
+  assert.equal(indexRequests, 1);
+});
+
+test("a failed Favorites save preserves the prior selection and allows retry", async (t) => {
+  const preferences = { favoriteActors: ["Actor.kept"] };
+  mockActorSources(t, async () => [], preferences);
+  game.settings.set = t.mock.fn(async () => { throw new Error("Storage unavailable"); });
+  t.mock.method(console, "error", () => {});
+  const notification = t.mock.method(ui.notifications, "error");
+  const app = new MKActorsApp();
+  const render = t.mock.method(app, "render");
+  const button = { dataset: { uuid: "Actor.new" } };
+  const event = { currentTarget: button, preventDefault() {}, stopPropagation() {} };
+  await app.onToggleFavorite(event);
+  assert.deepEqual([...app.favoriteActors], ["Actor.kept"]);
+  assert.deepEqual(preferences.favoriteActors, ["Actor.kept"]);
+  assert.equal(button.disabled, false);
+  assert.equal(app.savingFavorite, false);
+  assert.equal(render.mock.callCount(), 0);
+  assert.equal(notification.mock.calls[0].arguments[0], "MKACTORS.FavoritesUpdateFailed");
+
+  game.settings.set = async (_module, _key, value) => { preferences.favoriteActors = value; };
+  await app.onToggleFavorite(event);
+  assert.deepEqual(preferences.favoriteActors, ["Actor.kept", "Actor.new"]);
+  assert.equal(render.mock.callCount(), 1);
 });
 
 test("gallery starts with all accessible types and restores them when cleared", async (t) => {
@@ -635,6 +771,7 @@ test("legacy included and excluded type settings do not restrict the gallery", a
 test("gallery rerenders preserve a card's visual scroll position", () => {
   const app = new MKActorsApp();
   const originalGrid = {
+    scrollTop: 100,
     getBoundingClientRect: () => ({ top: 20 })
   };
   const originalCard = {
@@ -644,7 +781,7 @@ test("gallery rerenders preserve a card's visual scroll position", () => {
   };
 
   const anchor = app.getGridAnchor(originalCard);
-  assert.deepEqual(anchor, { uuid: "Actor.anchor", offset: 65 });
+  assert.deepEqual(anchor, { uuid: "Actor.anchor", offset: 65, scrollTop: 100 });
 
   const renderedGrid = {
     scrollTop: 100,
@@ -661,6 +798,10 @@ test("gallery rerenders preserve a card's visual scroll position", () => {
 
   assert.equal(renderedGrid.scrollTop, 155);
   assert.equal(app.pendingGridAnchor, null);
+
+  app.pendingGridAnchor = { ...anchor, uuid: "Actor.removed-favorite" };
+  app.restoreGridAnchor({ querySelector: () => renderedGrid });
+  assert.equal(renderedGrid.scrollTop, 100);
 
   app.element = {
     querySelector: () => originalCard
@@ -942,7 +1083,7 @@ test("portrait sync follow-up updates only on the initiating client", async (t) 
 
 test("loading more cards preserves the grid scroll position", () => {
   const app = new MKActorsApp();
-  const grid = { getBoundingClientRect: () => ({ top: 20 }) };
+  const grid = { scrollTop: 500, getBoundingClientRect: () => ({ top: 20 }) };
   const card = {
     dataset: { uuid: "Actor.one" },
     closest: () => grid,
@@ -966,7 +1107,7 @@ test("loading more cards preserves the grid scroll position", () => {
 
   assert.equal(app.visibleLimit, 400);
   assert.equal(renders, 1);
-  assert.deepEqual(app.pendingGridAnchor, { uuid: card.dataset.uuid, offset: -500 });
+  assert.deepEqual(app.pendingGridAnchor, { uuid: card.dataset.uuid, offset: -500, scrollTop: 500 });
   const renderedGrid = {
     scrollTop: 0,
     getBoundingClientRect: () => ({ top: 20 }),

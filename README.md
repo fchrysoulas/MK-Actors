@@ -1,10 +1,10 @@
 # MK Actors
 
-A system-agnostic Foundry VTT module for v12-v13 that provides a searchable visual gallery of Actor documents. GMs and players can browse Actors they are allowed to see and drag Actor cards onto the active Scene.
+A system-agnostic Foundry VTT module for v13-v14 that provides a searchable visual gallery of Actor documents. GMs and players can browse Actors they are allowed to see and drag Actor cards onto the active Scene.
 
 ## Compatibility
 
-- Foundry VTT: v12-v13
+- Foundry VTT: v13-v14 only
 - Systems: system agnostic
 - Documents used: Foundry `Actor` documents only
 - No Shadowdark, D&D5e, PF2e, or other system dependency
@@ -18,6 +18,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Search by name, Actor type, source, or compendium ID.
 - Filter by any Actor type found in accessible sources, including player-character types, or select All Types.
 - Filter by source from a left tree view with World folders, unfiled World actors, and Actor compendiums.
+- Star an Actor card to add it to **Favorites**, then select **Favorites** in Sources to browse starred world and compendium Actors together. Click its star again to remove it. Favorites stay saved on this Foundry client after reopening or reloading and work with search, type filtering, and the collapsed Sources rail.
 - Collapse the Sources sidebar to a compact icon rail using its small header toggle to give Actor cards more room. Hover over an icon to see the source name. Source filtering and the selected-source highlight remain available, and the sidebar keeps its state while browsing, refreshing, or reopening the gallery during the current session.
 - The compact Sources header aligns with the search header at MK Scene Gallery's height, fills the sidebar width, and stays in place while the source list scrolls.
 - Render large result sets in batches while loading Actor compendium indexes concurrently.
@@ -34,6 +35,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Drag from an Actor portrait as part of the card.
 - Double-click an Actor card to open its sheet.
 - Right-click an Actor card to open the **Actor Editor**, a separate, movable, resizable popup for its portrait image, token dimensions, fit mode, anchor, and scale.
+- Edit **Name** in Actor Editor to update the Actor name and prototype token name together when you click **Save and Close**.
 - Position the image visually in the Actor Editor's token preview: drag it to set the anchors, and drag its corner handle or use the mouse wheel to set the scale ratio. Numeric controls stay in sync. Arrow keys move the image; plus and minus adjust scale. Click **Save and Close** to save the changes and close the editor. If saving fails, the editor stays open so you can retry.
 - Keep the gallery at its current scroll position when the editor opens, applies changes, or closes. Left-clicking does not open the editor.
 - Open an Actor sheet from the gallery.
@@ -83,7 +85,7 @@ Install or update through Foundry's module installer using this manifest URL:
 https://github.com/fchrysoulas/MK-Actors/releases/latest/download/module.json
 ```
 
-Release v0.4.0 supports Foundry VTT v12-v13.
+The module supports Foundry VTT v13-v14 only.
 
 For a manual installation:
 
@@ -113,6 +115,7 @@ Then restart Foundry, enable **MK Actors** in your world, and open the gallery.
 
 ```text
 mk-actors/
+  .github/workflows/release.yml
   AGENTS.md
   CHANGELOG.md
   LICENSE
@@ -137,6 +140,8 @@ mk-actors/
   templates/gallery.hbs
   templates/token-portrait-editor.hbs
   tests/module.test.js
+  tests/release.test.js
+  tools/prepare-release.mjs
   docs/UI_STYLE_RULES.md
 ```
 
@@ -148,6 +153,23 @@ Run the dependency-free Node test suite with:
 npm test
 ```
 
+## Publishing a release
+
+GitHub Actions builds and publishes the Foundry release assets; no local PowerShell release script is needed.
+
+1. Update `version` in `module.json` and add a dated entry for the same version in `CHANGELOG.md`, moving the relevant Unreleased notes into it.
+2. Verify the module in Foundry v13 and v14, run `npm test`, and commit and push the release changes, including the release workflow.
+3. Create and push a matching version tag. For example, after setting the version to `0.5.0`:
+
+   ```text
+   git tag v0.5.0
+   git push origin v0.5.0
+   ```
+
+The **Publish Foundry module** workflow checks out that tag, runs the tests and syntax checks, validates localization JSON and packaged manifest paths, and requires matching version and dated changelog entries. It packages the runtime files and module documentation, then creates a GitHub release containing `module.json` and `mk-actors.zip`. The packaged manifest gets download URLs for that repository and tag automatically. Foundry's existing latest-manifest installation URL stays the same.
+
+To publish an existing tag manually, open **Actions > Publish Foundry module > Run workflow**, enter the tag, and optionally select **Create a draft release for review**. Tags with a prerelease suffix, such as `v0.5.0-beta.1`, are marked as prereleases. Existing releases are not overwritten. Publishing uses GitHub's automatic `GITHUB_TOKEN` with `contents: write`; no personal access token is required.
+
 ## License
 
 MK Actors is released under the MIT License. See `LICENSE`.
@@ -158,7 +180,6 @@ See `CHANGELOG.md` for release notes and versioning guidance.
 
 ## Suggested next upgrades
 
-- Favorites / pinned creatures.
 - Encounter tray before dropping.
 - Tagging by folder or custom flags.
 - Pack whitelist / blacklist.

@@ -68,6 +68,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
     return {
       uuid: actor.uuid,
       name: actor.name || localize("UnnamedActor"),
+      actorName: actor.name ?? "",
       portraitImage: actor.img ?? "",
       previewImage: actor.img || DEFAULT_ACTOR_IMAGE,
       width: prototypeToken?.width ?? 1,
@@ -82,6 +83,8 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
       scale: prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
       labels: {
         title: localize("TokenPortraitEditorTitle"),
+        name: localize("Name"),
+        nameHint: localize("ActorNameHint"),
         preview: localize("TokenPreview"),
         previewHint: localize("TokenPreviewHint"),
         previewControls: localize("TokenPreviewControls"),
@@ -195,9 +198,15 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
 
     const prototypeToken = actor.prototypeToken;
     const currentFit = prototypeToken?.texture?.fit || "height";
+    const actorName = String(form.querySelector("[name='actorName']")?.value ?? actor.name ?? "").trim();
     const portraitImg = String(form.querySelector("[name='portraitImg']")?.value ?? "").trim();
     const requestedFit = String(form.querySelector("[name='tokenFit']")?.value ?? currentFit);
     const allowedFits = new Set(["contain", "cover", "fill", "height", "width"]);
+
+    if (!actorName) {
+      ui.notifications.warn(localize("ActorNameRequired"));
+      return false;
+    }
 
     if (!portraitImg) {
       ui.notifications.warn(localize("ImagePathRequired"));
@@ -205,6 +214,8 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
     }
 
     const updates = {
+      name: actorName,
+      "prototypeToken.name": actorName,
       img: portraitImg,
       "prototypeToken.width": normalizeNumber(
         form.querySelector("[name='tokenWidth']")?.value,

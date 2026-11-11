@@ -189,6 +189,7 @@
 .mk-actors__toolbar button,
 .mk-actors__sources-toggle,
 .mk-actors__actions button,
+.mk-actors__favorite,
 .mk-actors-token-editor__browse {
   display: inline-grid;
   place-items: center;
@@ -211,13 +212,15 @@
 
 .mk-actors__toolbar button i,
 .mk-actors__sources-toggle i,
-.mk-actors__actions button i {
+.mk-actors__actions button i,
+.mk-actors__favorite i {
   margin: 0;
 }
 
 .mk-actors__toolbar button:hover,
 .mk-actors__sources-toggle:hover,
 .mk-actors__actions button:hover,
+.mk-actors__favorite:hover,
 .mk-actors-token-editor__browse:hover {
   border-color: var(--mk-actors-primary-border);
   background: var(--mk-actors-primary-soft);
@@ -689,7 +692,8 @@
   right: 12px;
 }
 
-.mk-actors__actions button {
+.mk-actors__actions button,
+.mk-actors__favorite {
   width: 26px;
   min-width: 26px;
   height: 26px;
@@ -699,6 +703,28 @@
   background: rgba(17, 22, 32, 0.92);
   color: var(--mk-actors-text-muted);
   font-size: 12px;
+}
+
+.mk-actors__favorite {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 12px;
+}
+
+.mk-actors__favorite.is-favorite {
+  border-color: var(--mk-actors-primary-border);
+  background: rgba(49, 37, 23, 0.94);
+  color: var(--mk-actors-primary-bright);
+}
+
+.mk-actors__favorite:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.mk-actors__source-tree button[data-source="favorites"] > i {
+  color: var(--mk-actors-primary);
 }
 
 .mk-actors__load-more {

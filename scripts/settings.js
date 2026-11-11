@@ -16,6 +16,15 @@ function refreshAfterSettingChange(setting, value) {
 }
 
 export function registerSettings() {
+  game.settings.register(MODULE_ID, "favoriteActors", {
+    name: game.i18n.localize("MKACTORS.FavoriteActors"),
+    hint: game.i18n.localize("MKACTORS.FavoriteActorsHint"),
+    scope: "client",
+    config: false,
+    type: Array,
+    default: []
+  });
+
   game.settings.register(MODULE_ID, "includeWorldActors", {
     name: game.i18n.localize("MKACTORS.IncludeWorldActors"),
     hint: game.i18n.localize("MKACTORS.IncludeWorldActorsHint"),
