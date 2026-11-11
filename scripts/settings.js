@@ -1,7 +1,8 @@
-import { MODULE_ID } from "./constants.js";
+import { MODULE_ID, TOKEN_SHADOW_SETTINGS } from "./constants.js";
 import { debugLog } from "./debug.js";
 import { MKActorsApi } from "./api.js";
-import { openTokenShadowSettings } from "./shadowdark-integration.js";
+import { openTokenShadowSettings } from "./token-shadow-controls.js";
+import { refreshTokenShadows } from "./token-shadows.js";
 
 class MKActorsOpenGalleryMenu extends foundry.applications.api.ApplicationV2 {
   render(_force, _options = {}) {
@@ -24,6 +25,14 @@ function refreshAfterSettingChange(setting, value) {
 }
 
 export function registerSettings() {
+  for (const definition of TOKEN_SHADOW_SETTINGS) {
+    game.settings.register(MODULE_ID, definition.key, {
+      name: game.i18n.localize(`MKACTORS.${definition.label}`),
+      scope: "world", config: false, type: definition.type,
+      default: definition.default, ...(definition.range ? { range: { ...definition.range } } : {}),
+      onChange: refreshTokenShadows
+    });
+  }
   game.settings.register(MODULE_ID, "favoriteActors", {
     name: game.i18n.localize("MKACTORS.FavoriteActors"),
     hint: game.i18n.localize("MKACTORS.FavoriteActorsHint"),

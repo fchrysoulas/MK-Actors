@@ -57,12 +57,21 @@ test("token shadow entries remain visible to GMs when MK Shadowdark is unavailab
   game.user = { ...priorUser, isGM: true };
   game.modules = new Map();
   const menus = new Map();
+  const definitions = new Map();
   game.settings = {
     get: () => false,
-    register() {},
+    register: (namespace, key, definition) => {
+      assert.equal(namespace, "mk-actors");
+      definitions.set(key, definition);
+    },
     registerMenu: (module, key, config) => menus.set(`${module}.${key}`, config)
   };
   registerSettings();
+  assert.equal(definitions.get("tokenShadowsEnabled").default, false);
+  assert.equal(definitions.get("tokenShadowsEnabled").scope, "world");
+  assert.equal(definitions.get("tokenShadowWidthFactor").default, 0.75);
+  assert.deepEqual(definitions.get("tokenShadowAlpha").range, { min: 0, max: 1, step: 0.05 });
+  assert.equal(typeof definitions.get("tokenShadowBlur").onChange, "function");
   assert.equal(menus.get("mk-actors.tokenShadows").restricted, true);
   game.modules.set("mk-shadowdark", { active: true });
   registerSettings();

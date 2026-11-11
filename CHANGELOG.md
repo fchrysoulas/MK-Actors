@@ -8,7 +8,9 @@ This project follows semantic versioning where practical:
 - `MINOR` versions add backwards-compatible features.
 - `PATCH` versions fix bugs or polish existing behavior.
 
-## Unreleased
+## 0.7.0 - 2026-11-11
+
+- Added a standalone token-shadow renderer adapted from MK Shadowdark, with MK Actors-owned world settings and no required module or game system. Shadows are opt-in, follow tokens, clean up on Scene teardown, and yield to MK Shadowdark when its renderer is already enabled.
 
 ## 0.6.1 - 2026-11-11
 

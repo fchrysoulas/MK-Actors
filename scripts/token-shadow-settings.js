@@ -1,5 +1,6 @@
-import { MK_SHADOWDARK_ID, MODULE_ID } from "./constants.js";
-import { getTokenShadowFields, saveTokenShadowSettings } from "./shadowdark-integration.js";
+import { MODULE_ID } from "./constants.js";
+import { getTokenShadowFields, saveTokenShadowSettings } from "./token-shadow-controls.js";
+import { isShadowdarkDrawingShadows } from "./token-shadows.js";
 import { localize } from "./utils.js";
 import { prepareWindowDrag } from "./window-drag.js";
 
@@ -16,8 +17,8 @@ export class MKTokenShadowSettings extends foundry.applications.api.ApplicationV
     return {
       fields, available: fields.length > 0,
       hint: localize("TokenShadowSettingsHint"),
-      unavailable: localize(!game.user?.isGM ? "TokenShadowsGMOnly"
-        : game.modules?.get?.(MK_SHADOWDARK_ID)?.active ? "TokenShadowsSettingsRequired" : "TokenShadowsModuleRequired"),
+      unavailable: localize("TokenShadowsGMOnly"),
+      notice: isShadowdarkDrawingShadows() ? localize("TokenShadowsOtherRenderer") : "",
       close: localize("Close"), save: localize("SaveAndClose")
     };
   }
@@ -51,7 +52,7 @@ export class MKTokenShadowSettings extends foundry.applications.api.ApplicationV
       await this.close();
       return true;
     } catch (error) {
-      console.error(`${MODULE_ID} | Could not save shared token shadow settings.`, error);
+      console.error(`${MODULE_ID} | Could not save token shadow settings.`, error);
       ui.notifications.error(error.message);
       return false;
     }

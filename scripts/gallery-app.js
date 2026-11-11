@@ -11,7 +11,7 @@ import {
 import { MKTokenPortraitEditor } from "./token-portrait-editor.js";
 import { localize } from "./utils.js";
 import { prepareWindowDrag } from "./window-drag.js";
-import { openTokenShadowSettings } from "./shadowdark-integration.js";
+import { openTokenShadowSettings } from "./token-shadow-controls.js";
 
 export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {

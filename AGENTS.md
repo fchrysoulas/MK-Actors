@@ -24,8 +24,9 @@ scripts/gallery-app.js   ApplicationV2 gallery implementation
 scripts/hooks.js         Foundry hook callbacks
 scripts/main.js          Module entry point and hook registration
 scripts/settings.js      Settings and keybinding registration
-scripts/shadowdark-integration.js Optional MK Shadowdark Token Shadows settings integration
-scripts/token-shadow-settings.js Native fallback for shared Token Shadows settings
+scripts/token-shadow-controls.js Standalone Token Shadows settings actions
+scripts/token-shadow-settings.js ApplicationV2 Token Shadows settings window
+scripts/token-shadows.js Standalone token shadow renderer and canvas lifecycle hooks
 scripts/file-picker.js   Foundry FilePicker compatibility resolver
 scripts/token-preview.js Interactive token image preview and fitting geometry
 scripts/window-drag.js  Composited window movement with Foundry position commits

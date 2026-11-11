@@ -2,6 +2,7 @@
   <form class="mk-actors__inspector-form">
     <div class="mk-actors__inspector-scroll">
       <p class="notes">{{hint}}</p>
+      {{#if notice}}<p class="notes" role="status">{{notice}}</p>{{/if}}
       {{#if available}}
         {{#each fields}}
           <div class="mk-actors__inspector-section">

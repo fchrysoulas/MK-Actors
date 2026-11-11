@@ -5,7 +5,7 @@ import { resolveFilePickerClass } from "./file-picker.js";
 import { TokenImagePreview } from "./token-preview.js";
 import { localize, normalizeNumber } from "./utils.js";
 import { prepareWindowDrag } from "./window-drag.js";
-import { openTokenShadowSettings } from "./shadowdark-integration.js";
+import { openTokenShadowSettings } from "./token-shadow-controls.js";
 
 export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
