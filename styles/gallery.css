@@ -952,6 +952,19 @@
   line-height: 1.4;
 }
 
+.mk-actors-token-shadow-settings-app .mk-actors__shadow-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mk-actors-token-shadow-settings-app .mk-actors__inspector input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  accent-color: var(--mk-actors-primary);
+}
+
 .mk-actors__inspector-footer {
   display: grid;
   grid-template-columns: 1fr 1fr;

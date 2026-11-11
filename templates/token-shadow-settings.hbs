@@ -1,0 +1,29 @@
+<section class="mk-actors__inspector">
+  <form class="mk-actors__inspector-form">
+    <div class="mk-actors__inspector-scroll">
+      <p class="notes">{{hint}}</p>
+      {{#if available}}
+        {{#each fields}}
+          <div class="mk-actors__inspector-section">
+            <label for="mk-actors-shadow-{{key}}" class="{{#if isBoolean}}mk-actors__shadow-toggle{{/if}}">
+              {{#if isBoolean}}
+                <input id="mk-actors-shadow-{{key}}" name="{{key}}" type="checkbox" {{#if value}}checked{{/if}}>
+              {{/if}}
+              {{label}}
+            </label>
+            {{#unless isBoolean}}
+              <input id="mk-actors-shadow-{{key}}" name="{{key}}" type="number"
+                     value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}" required>
+            {{/unless}}
+          </div>
+        {{/each}}
+      {{else}}
+        <p role="status">{{unavailable}}</p>
+      {{/if}}
+    </div>
+    <footer class="mk-actors__inspector-footer">
+      <button type="button" data-action="close-shadow-settings">{{close}}</button>
+      {{#if available}}<button type="submit">{{save}}</button>{{/if}}
+    </footer>
+  </form>
+</section>

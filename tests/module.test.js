@@ -49,7 +49,7 @@ const { resolveActor } = await import("../scripts/documents.js");
 const { resolveFilePickerClass } = await import("../scripts/file-picker.js");
 const { registerSettings } = await import("../scripts/settings.js");
 
-test("MK Shadowdark shortcuts require an active module and restrict world settings to GMs", (t) => {
+test("token shadow entries remain visible to GMs when MK Shadowdark is unavailable", (t) => {
   const priorModules = game.modules;
   const priorSettings = game.settings;
   const priorUser = game.user;
@@ -63,7 +63,7 @@ test("MK Shadowdark shortcuts require an active module and restrict world settin
     registerMenu: (module, key, config) => menus.set(`${module}.${key}`, config)
   };
   registerSettings();
-  assert.equal(menus.has("mk-actors.tokenShadows"), false);
+  assert.equal(menus.get("mk-actors.tokenShadows").restricted, true);
   game.modules.set("mk-shadowdark", { active: true });
   registerSettings();
   assert.equal(menus.get("mk-actors.tokenShadows").restricted, true);
@@ -71,12 +71,25 @@ test("MK Shadowdark shortcuts require an active module and restrict world settin
 
   game.settings.menus = new Map([["mk-shadowdark.tokenShadowsSettings", { type: class {} }]]);
   const editor = new MKTokenPortraitEditor({ uuid: "Actor.shadow-test" });
-  assert.equal(editor.buildTokenEditorData(editor.actor).canConfigureTokenShadows, true);
+  assert.equal(editor.buildTokenEditorData(editor.actor).showTokenShadowSettings, true);
   game.user.isGM = false;
-  assert.equal(editor.buildTokenEditorData(editor.actor).canConfigureTokenShadows, false);
+  assert.equal(editor.buildTokenEditorData(editor.actor).showTokenShadowSettings, false);
   game.user.isGM = true;
   game.modules.clear();
-  assert.equal(editor.buildTokenEditorData(editor.actor).canConfigureTokenShadows, false);
+  assert.equal(editor.buildTokenEditorData(editor.actor).showTokenShadowSettings, true);
+});
+
+test("the gallery exposes token shadow settings to GMs even with no Actors or MK Shadowdark", async (t) => {
+  const priorUser = game.user;
+  const priorModules = game.modules;
+  t.after(() => { game.user = priorUser; game.modules = priorModules; });
+  mockActorSources(t, async () => []);
+  game.modules = new Map();
+  game.user = { isGM: true };
+  const app = new MKActorsApp();
+  assert.equal((await app.getData()).showTokenShadowSettings, true);
+  game.user.isGM = false;
+  assert.equal((await app.getData()).showTokenShadowSettings, false);
 });
 
 function deferred() {

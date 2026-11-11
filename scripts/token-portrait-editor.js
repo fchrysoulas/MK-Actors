@@ -5,7 +5,7 @@ import { resolveFilePickerClass } from "./file-picker.js";
 import { TokenImagePreview } from "./token-preview.js";
 import { localize, normalizeNumber } from "./utils.js";
 import { prepareWindowDrag } from "./window-drag.js";
-import { canConfigureTokenShadows, openTokenShadowSettings } from "./shadowdark-integration.js";
+import { openTokenShadowSettings } from "./shadowdark-integration.js";
 
 export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -82,7 +82,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
       anchorX: prototypeToken?.texture?.anchorX ?? 0.5,
       anchorY: prototypeToken?.texture?.anchorY ?? 0.5,
       scale: prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
-      canConfigureTokenShadows: canConfigureTokenShadows(),
+      showTokenShadowSettings: game.user?.isGM === true,
       labels: {
         title: localize("TokenPortraitEditorTitle"),
         name: localize("Name"),

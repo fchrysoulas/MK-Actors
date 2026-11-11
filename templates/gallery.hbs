@@ -2,6 +2,12 @@
   <header class="mk-actors__toolbar">
     <div class="mk-actors__toolbar-controls">
       <div class="mk-actors__toolbar-actions">
+        {{#if showTokenShadowSettings}}
+          <button type="button" data-action="configure-token-shadows"
+                  title="{{localize 'MKACTORS.ConfigureTokenShadows'}}" aria-label="{{localize 'MKACTORS.ConfigureTokenShadows'}}">
+            <i class="fas fa-circle-half-stroke" aria-hidden="true"></i>
+          </button>
+        {{/if}}
         <button type="button" data-action="clear" title="{{localize 'MKACTORS.Clear'}}" aria-label="{{localize 'MKACTORS.Clear'}}">
           <i class="fas fa-eraser" aria-hidden="true"></i>
         </button>

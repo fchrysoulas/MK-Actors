@@ -348,10 +348,11 @@ Recommended state behavior:
   cancel a drag. Preview gestures remain unsaved until Save and Close is used.
   Close the editor after a successful save; keep it open if saving fails.
 - Notes are muted but retain readable contrast and adequate line height.
-- When MK Shadowdark's Token Shadows controls are available, GMs may open its
-  registered settings window from a compact section with an icon-only sliders
-  button. Explain that these settings affect all Scene tokens and save in that
-  window independently of Actor Editor. Hide the section when unavailable.
+- Keep the GM Token Shadows section and gallery toolbar shortcut visible even
+  when MK Shadowdark is unavailable. Open its registered settings window when
+  supported; otherwise use the native fallback to edit its registered settings
+  or explain missing prerequisites. Explain that these settings affect all Scene
+  tokens and save independently of Actor Editor. Keep controls hidden for players.
 - At narrow widths, paired fields stack if their usable input width would fall
   below roughly `120px`.
 - Native validity, labels, keyboard access, and Foundry v13-v14 behavior take

@@ -11,6 +11,7 @@ import {
 import { MKTokenPortraitEditor } from "./token-portrait-editor.js";
 import { localize } from "./utils.js";
 import { prepareWindowDrag } from "./window-drag.js";
+import { openTokenShadowSettings } from "./shadowdark-integration.js";
 
 export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -136,6 +137,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       sourcesToggleLabel: localize(this.sourcesCollapsed ? "ExpandSources" : "CollapseSources"),
       state: this.filters,
       cardSize,
+      showTokenShadowSettings: game.user?.isGM === true,
       warnings: this.warnings,
       emptyMessage: localize(emptyFavorites ? "NoFavorites" : "NoActors")
     };
@@ -146,6 +148,9 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     debugLog("Activating gallery listeners");
 
     root.querySelector?.("[data-action='toggle-sources']")?.addEventListener("click", () => this.toggleSources(root));
+    root.querySelector?.("[data-action='configure-token-shadows']")?.addEventListener("click", () => {
+      void openTokenShadowSettings();
+    });
 
     root.querySelector?.("[data-action='search']")?.addEventListener("input", (event) => {
       this.filters.search = event.currentTarget.value || "";

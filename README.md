@@ -42,7 +42,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Client-side card size setting.
 - Client-side debug mode for tracing module actions in the browser console.
 - World setting to sync Actor portrait changes to prototype token images.
-- Optional GM shortcut to MK Shadowdark's shared Token Shadows controls from Actor Editor and MK Actors module settings, when MK Shadowdark is active.
+- GM shortcuts to MK Shadowdark's shared Token Shadows controls from the gallery toolbar, Actor Editor, and MK Actors module settings, with a fallback window and clear prerequisites when unavailable.
 
 ## System-agnostic filtering
 
@@ -60,9 +60,9 @@ The gallery opens with **All Types**, showing every accessible Actor type, inclu
 
 ## Optional MK Shadowdark token shadows
 
-With **MK Shadowdark** active, GMs can open **Token shadows (MK Shadowdark)** from Actor Editor using its sliders button, or from **Configure Settings > Module Settings > MK Actors > Configure token shadows**. In that window, enable **Token Shadows | Enabled** and adjust shadow size, offset, opacity, and blur.
+GMs can open **Token shadows (MK Shadowdark)** using the half-circle button at the start of the gallery toolbar, Actor Editor's sliders button, or **Configure Settings > Module Settings > MK Actors > Configure token shadows**. These entry points stay visible to GMs even when MK Shadowdark is unavailable; the window explains missing prerequisites.
 
-These are MK Shadowdark's existing world settings: they affect all Scene tokens, including tokens dragged from MK Actors. They are not per-Actor options and save through MK Shadowdark's settings window independently of Actor Editor's **Save and Close**. MK Shadowdark handles drawing and refreshing the shadows. MK Actors does not duplicate its settings or renderer, and the Actor Editor shortcut is hidden for non-GMs and when compatible Token Shadows controls are unavailable. MK Shadowdark is optional; other systems can continue using the gallery without it.
+With **MK Shadowdark** active, enable token shadows in that window and adjust size, offset, opacity, and blur. MK Actors opens MK Shadowdark's registered menu when available. Otherwise, a native ApplicationV2 fallback edits the same registered world settings, using their existing values and limits. These settings affect all Scene tokens, including tokens dragged from MK Actors, and save independently of Actor Editor's **Save and Close**. MK Shadowdark handles drawing and refreshing the shadows. The controls are GM-only; MK Shadowdark remains optional for browsing and dragging Actors.
 
 ## How to open the gallery
 
@@ -140,6 +140,7 @@ mk-actors/
   scripts/main.js
   scripts/settings.js
   scripts/shadowdark-integration.js
+  scripts/token-shadow-settings.js
   scripts/file-picker.js
   scripts/token-portrait-editor.js
   scripts/token-preview.js
@@ -147,6 +148,7 @@ mk-actors/
   styles/gallery.css
   templates/gallery.hbs
   templates/token-portrait-editor.hbs
+  templates/token-shadow-settings.hbs
   tests/module.test.js
   tests/release.test.js
   tests/shadowdark-integration.test.js

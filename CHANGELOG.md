@@ -10,6 +10,10 @@ This project follows semantic versioning where practical:
 
 ## Unreleased
 
+## 0.6.1 - 2026-11-11
+
+- Kept token-shadow entry points visible to GMs, added a gallery toolbar shortcut, and added a native fallback for MK Shadowdark versions without a custom settings menu. Missing prerequisites now appear in the window instead of hiding the interface.
+
 ## 0.6.0 - 2026-11-11
 
 - Added optional GM shortcuts in Actor Editor and module settings to MK Shadowdark's shared Token Shadows controls, affecting all Scene tokens without duplicating settings or shadow rendering.

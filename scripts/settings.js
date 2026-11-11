@@ -1,4 +1,4 @@
-import { MK_SHADOWDARK_ID, MODULE_ID } from "./constants.js";
+import { MODULE_ID } from "./constants.js";
 import { debugLog } from "./debug.js";
 import { MKActorsApi } from "./api.js";
 import { openTokenShadowSettings } from "./shadowdark-integration.js";
@@ -106,16 +106,14 @@ export function registerSettings() {
     type: MKActorsOpenGalleryMenu,
     restricted: false
   });
-  if (game.modules?.get?.(MK_SHADOWDARK_ID)?.active) {
-    game.settings.registerMenu(MODULE_ID, "tokenShadows", {
-      name: game.i18n.localize("MKACTORS.TokenShadowSettings"),
-      label: game.i18n.localize("MKACTORS.ConfigureTokenShadows"),
-      hint: game.i18n.localize("MKACTORS.TokenShadowSettingsHint"),
-      icon: "fas fa-circle-half-stroke",
-      type: MKActorsTokenShadowsMenu,
-      restricted: true
-    });
-  }
+  game.settings.registerMenu(MODULE_ID, "tokenShadows", {
+    name: game.i18n.localize("MKACTORS.TokenShadowSettings"),
+    label: game.i18n.localize("MKACTORS.ConfigureTokenShadows"),
+    hint: game.i18n.localize("MKACTORS.TokenShadowSettingsHint"),
+    icon: "fas fa-circle-half-stroke",
+    type: MKActorsTokenShadowsMenu,
+    restricted: true
+  });
   debugLog("Settings registered");
 }
 
