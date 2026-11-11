@@ -207,6 +207,12 @@ export function addSceneControlButton(controls) {
   }
 }
 
+export function scheduleActorGalleryRefresh(_actor, changes = {}) {
+  // Combat statistics do not change gallery cards, permissions, or filters.
+  if (!Object.keys(changes).some((key) => /^(name|img|type|folder|ownership|permission|prototypeToken)(\.|$)/.test(key))) return;
+  scheduleGalleryRefresh();
+}
+
 export function scheduleGalleryRefresh() {
   clearTimeout(galleryRefreshTimer);
   galleryRefreshTimer = setTimeout(() => {

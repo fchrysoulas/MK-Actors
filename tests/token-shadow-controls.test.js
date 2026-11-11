@@ -5,6 +5,8 @@ import { getTokenShadowFields, openTokenShadowSettings, saveTokenShadowSettings 
 
 globalThis.foundry = { applications: { api: { ApplicationV2: class {
   render() { this.context = this._prepareContext(); this.rendered = true; return this; }
+  async maximize() { return this; }
+  bringToFront() {}
   async close() { this.rendered = false; return this; }
 } } } };
 
@@ -27,7 +29,10 @@ function setup(t, isGM = true) {
 
 function submission(values) {
   const inputs = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, { value: String(value), checked: value }]));
-  return { preventDefault() {}, currentTarget: { reportValidity: () => true, elements: { namedItem: (key) => inputs[key] } } };
+  return { preventDefault() {}, currentTarget: {
+    reportValidity: () => true, elements: { namedItem: (key) => inputs[key] },
+    querySelectorAll: () => Object.values(inputs)
+  } };
 }
 
 test("standalone shadow controls open and save without MK Shadowdark or its settings registry", async (t) => {
@@ -84,8 +89,49 @@ test("failed setting writes keep the standalone settings window open", async (t)
   game.settings.set = async () => { throw new Error("Save failed"); };
   t.mock.method(console, "error", () => {});
   const app = await openTokenShadowSettings();
-  assert.equal(await app.onSubmit(submission({ ...values, tokenShadowsEnabled: true })), false);
+  const event = submission({ ...values, tokenShadowsEnabled: true });
+  assert.equal(await app.onSubmit(event), false);
   assert.equal(app.rendered, true);
+  assert.equal(app.saving, false);
+  assert.ok(event.currentTarget.querySelectorAll().every((input) => input.disabled === false));
   assert.equal(ui.notifications.error.mock.callCount(), 1);
   assert.equal(getTokenShadowFields().length, 7);
+});
+
+test("opening the existing shadow window preserves unsaved controls", async (t) => {
+  setup(t);
+  const app = await openTokenShadowSettings();
+  const render = t.mock.method(app, "render");
+  const maximize = t.mock.method(app, "maximize", async () => {});
+  const focus = t.mock.method(app, "bringToFront", () => {});
+  app.context.fields.find((field) => field.key === "tokenShadowAlpha").value = 0.8;
+  t.after(() => app.close());
+  assert.equal(await openTokenShadowSettings(), app);
+  assert.equal(render.mock.callCount(), 0);
+  assert.equal(maximize.mock.callCount(), 1);
+  assert.equal(focus.mock.callCount(), 1);
+  assert.equal(app.context.fields.find((field) => field.key === "tokenShadowAlpha").value, 0.8);
+});
+
+test("repeated submits cannot overlap shadow saves or overwrite the first draft", async (t) => {
+  const { values } = setup(t);
+  const app = await openTokenShadowSettings();
+  let finishWrite;
+  const pendingWrite = new Promise((resolve) => { finishWrite = resolve; });
+  game.settings.set = t.mock.fn(async (_namespace, key, value) => {
+    await pendingWrite;
+    values[key] = value;
+  });
+  const firstEvent = submission({ ...values, tokenShadowsEnabled: true, tokenShadowAlpha: 0.7 });
+  const firstSave = app.onSubmit(firstEvent);
+  const disabledWhileSaving = firstEvent.currentTarget.querySelectorAll().every((input) => input.disabled);
+  const secondSave = app.onSubmit(submission({ ...values, tokenShadowsEnabled: true, tokenShadowAlpha: 0.8 }));
+  const initialWrites = game.settings.set.mock.callCount();
+  finishWrite();
+  const results = await Promise.all([firstSave, secondSave]);
+  assert.equal(initialWrites, 1);
+  assert.equal(disabledWhileSaving, true);
+  assert.deepEqual(results, [true, false]);
+  assert.equal(values.tokenShadowAlpha, 0.7);
+  assert.equal(game.settings.set.mock.callCount(), 2);
 });

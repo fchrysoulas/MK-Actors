@@ -7,6 +7,7 @@ import {
   addDirectoryButton,
   addSceneControlButton,
   ensurePortraitSyncedToTokenImage,
+  scheduleActorGalleryRefresh,
   scheduleGalleryRefresh,
   syncPortraitToTokenImage
 } from "./hooks.js";
@@ -30,10 +31,10 @@ registerTokenShadowHooks();
 Hooks.on("getSceneControlButtons", addSceneControlButton);
 Hooks.on("preUpdateActor", syncPortraitToTokenImage);
 Hooks.on("updateActor", ensurePortraitSyncedToTokenImage);
+Hooks.on("updateActor", scheduleActorGalleryRefresh);
 
 for (const hook of [
   "createActor",
-  "updateActor",
   "deleteActor",
   "createFolder",
   "updateFolder",

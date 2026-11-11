@@ -353,6 +353,13 @@ Recommended state behavior:
   renderer. Explain that these world settings affect all Scene tokens and save
   independently of Actor Editor. Keep controls hidden for players. When another
   supported renderer is active, explain which renderer controls the appearance.
+- Token Shadows uses sliders paired with numeric inputs and a fixed preview
+  above the scrolling controls. Use the same shadow geometry and blur as Scene
+  tokens, keep draft changes inside the window, and release preview resources
+  when the window closes or rerenders.
+- Cache small blurred token shadows between appearance changes, bound the cache
+  pixel area, and release cached textures on removal. Share one settings snapshot
+  across Scene refreshes. Combat-only Actor updates must not rebuild the gallery.
 - At narrow widths, paired fields stack if their usable input width would fall
   below roughly `120px`.
 - Native validity, labels, keyboard access, and Foundry v13-v14 behavior take

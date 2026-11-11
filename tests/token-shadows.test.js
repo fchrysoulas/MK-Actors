@@ -8,6 +8,7 @@ function setup(t) {
   const values = Object.fromEntries(TOKEN_SHADOW_SETTINGS.map((setting) => [setting.key, setting.default]));
   values.tokenShadowsEnabled = true;
   class Graphics {
+    cacheAsBitmap = false;
     clearCount = 0;
     destroyed = false;
     filters = null;
@@ -76,6 +77,46 @@ test("movement reuses geometry and filters while resizing and setting changes re
   assert.equal(token.children.length, 1);
 });
 
+test("blurred shadows cache their pixels until appearance changes and cap cache size", (t) => {
+  const { token, values } = setup(t);
+  refreshTokenShadow(token);
+  const shadow = token.children[0];
+  assert.equal(shadow.cacheAsBitmap, true);
+  assert.equal(shadow.cacheAsBitmapResolution, 1);
+  const changes = [];
+  let cached = true;
+  Object.defineProperty(shadow, "cacheAsBitmap", { get: () => cached, set(value) { cached = value; changes.push(value); } });
+  refreshTokenShadow(token);
+  assert.deepEqual(changes, []);
+  values.tokenShadowAlpha = 0.8;
+  refreshTokenShadows();
+  assert.deepEqual(changes, [false, true]);
+  assert.equal(shadow.fill.alpha, 0.8);
+  token.w = 3000;
+  refreshTokenShadow(token);
+  assert.equal(shadow.cacheAsBitmap, false);
+  assert.equal(shadow.filters.length, 1);
+  values.tokenShadowBlur = 0;
+  refreshTokenShadow(token);
+  assert.equal(shadow.cacheAsBitmap, false);
+  assert.equal(shadow.filters, null);
+  removeTokenShadow(token);
+  assert.equal(shadow.cacheAsBitmap, false);
+});
+
+test("a scene refresh reads one settings snapshot for all tokens", (t) => {
+  const { token } = setup(t);
+  canvas.tokens.placeables = [token, ...Array.from({ length: 499 }, () => ({
+    w: 100, h: 100, addChildAt(shadow) { shadow.parent = this; }, removeChild() {}
+  }))];
+  const get = t.mock.method(game.settings, "get");
+  refreshTokenShadows();
+  assert.equal(get.mock.callCount(), 7);
+  get.mock.resetCalls();
+  refreshTokenShadows();
+  assert.equal(get.mock.callCount(), 7);
+});
+
 test("disabling shadows releases graphics and blur filters exactly once", (t) => {
   const { token, values } = setup(t);
   refreshTokenShadow(token);
@@ -108,6 +149,39 @@ test("zero opacity, zero blur, absent blur support, and both PIXI filter namespa
   values.tokenShadowAlpha = 0;
   refreshTokenShadow(token);
   assert.equal(shadow.visible, false);
+});
+
+test("modern PIXI blur avoids the deprecated filters namespace", (t) => {
+  const { token, BlurFilter } = setup(t);
+  PIXI.BlurFilter = BlurFilter;
+  Object.defineProperty(PIXI, "filters", { get() { assert.fail("Deprecated PIXI.filters was accessed"); } });
+  refreshTokenShadow(token);
+  assert.ok(token.children[0].filters[0] instanceof BlurFilter);
+});
+
+test("damage refreshes leave token dimensions, mesh scale, and texture settings unchanged", (t) => {
+  const { token, hooks } = setup(t);
+  const document = Object.freeze({
+    object: token, width: 2, height: 1,
+    texture: Object.freeze({ scaleX: 1.4, scaleY: 1.4, fit: "contain" }),
+    update() { assert.fail("Shadows must not update Token documents"); }
+  });
+  token.document = document;
+  token.mesh = Object.freeze({ scale: Object.freeze({ x: 1.4, y: 1.4 }) });
+  token.scale = Object.freeze({ x: 1, y: 1 });
+  registerTokenShadowHooks();
+  refreshTokenShadow(token);
+  const shadow = token.children[0];
+  for (const hp of [5, 1, 0]) {
+    hooks.get("updateToken")(document, { delta: { system: { hp } } });
+    hooks.get("refreshToken")(token);
+    assert.equal(token.w, 200);
+    assert.equal(token.h, 100);
+    assert.equal(token.children[0], shadow);
+    assert.deepEqual(token.mesh.scale, { x: 1.4, y: 1.4 });
+    assert.deepEqual(document.texture, { scaleX: 1.4, scaleY: 1.4, fit: "contain" });
+  }
+  assert.equal(shadow.clearCount, 1);
 });
 
 test("invalid rendering values fall back or clamp to the original shadow limits", (t) => {

@@ -37,7 +37,10 @@ export async function openTokenShadowSettings() {
   try {
     const { MKTokenShadowSettings } = await import("./token-shadow-settings.js");
     const app = settingsApp ??= new MKTokenShadowSettings();
-    await app.render(true);
+    if (app.rendered) {
+      await app.maximize();
+      app.bringToFront();
+    } else await app.render(true);
     debugLog("Opened token shadow settings");
     return app;
   } catch (error) {

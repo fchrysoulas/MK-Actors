@@ -24,21 +24,32 @@ export function isShadowdarkDrawingShadows() {
   }
 }
 
-function shadowNumber(key) {
+function shadowNumber(key, getValue) {
   const definition = TOKEN_SHADOW_SETTINGS.find((setting) => setting.key === key);
-  const value = Number(getTokenShadowSetting(key));
+  const value = Number(getValue(key) ?? definition.default);
   return Number.isFinite(value)
     ? Math.min(definition.range.max, Math.max(definition.range.min, value)) : definition.default;
 }
 
+export function getTokenShadowAppearance({ width, height, gridSize }, getValue = getTokenShadowSetting) {
+  const radiusX = Math.max(2, width * shadowNumber("tokenShadowWidthFactor", getValue));
+  const radiusY = Math.max(1, gridSize * shadowNumber("tokenShadowHeightGridFactor", getValue));
+  return {
+    x: width / 2, y: height - radiusY * shadowNumber("tokenShadowOffsetYFactor", getValue), radiusX, radiusY,
+    alpha: shadowNumber("tokenShadowAlpha", getValue), blur: shadowNumber("tokenShadowBlur", getValue),
+    quality: Math.round(shadowNumber("tokenShadowBlurQuality", getValue))
+  };
+}
+
 function getBlurFilterClass() {
-  return globalThis.PIXI?.filters?.BlurFilter ?? globalThis.PIXI?.BlurFilter ?? null;
+  return globalThis.PIXI?.BlurFilter ?? globalThis.PIXI?.filters?.BlurFilter ?? null;
 }
 
 export function removeTokenShadow(token) {
   const state = shadowStates.get(token);
   if (!state) return;
   const { shadow, blurFilter } = state;
+  if (!shadow.destroyed && "cacheAsBitmap" in shadow) shadow.cacheAsBitmap = false;
   shadow.filters = null;
   try { blurFilter?.destroy?.(); } catch (_error) { /* The canvas may have already destroyed the filter. */ }
   if (!shadow.destroyed) {
@@ -73,23 +84,31 @@ export function refreshTokenShadow(token) {
     removeTokenShadow(token);
     return;
   }
+  refreshTokenShadowWithSettings(token, getTokenShadowSetting);
+}
+
+function readTokenShadowSettings() {
+  if (!getTokenShadowSetting("tokenShadowsEnabled") || isShadowdarkDrawingShadows()) return null;
+  return Object.fromEntries(TOKEN_SHADOW_SETTINGS.filter((field) => field.range)
+    .map((field) => [field.key, getTokenShadowSetting(field.key)]));
+}
+
+function refreshTokenShadowWithSettings(token, getValue) {
+  if (token.destroyed) return removeTokenShadow(token);
   const state = ensureTokenShadow(token);
   if (!state) return;
-  const { shadow } = state;
   const gridSize = canvas.grid?.size ?? 100;
-  const width = token.w ?? gridSize;
-  const height = token.h ?? gridSize;
-  const radiusX = Math.max(2, width * shadowNumber("tokenShadowWidthFactor"));
-  const radiusY = Math.max(1, gridSize * shadowNumber("tokenShadowHeightGridFactor"));
-  const x = width / 2;
-  const y = height - radiusY * shadowNumber("tokenShadowOffsetYFactor");
-  const alpha = shadowNumber("tokenShadowAlpha");
-  const blur = shadowNumber("tokenShadowBlur");
-  const quality = Math.round(shadowNumber("tokenShadowBlurQuality"));
+  drawTokenShadow(state, getTokenShadowAppearance({ width: token.w ?? gridSize, height: token.h ?? gridSize, gridSize }, getValue));
+}
+
+export function drawTokenShadow(state, { x, y, radiusX, radiusY, alpha, blur, quality }) {
+  const { shadow } = state;
   const BlurFilter = getBlurFilterClass();
   const drawState = [x, y, radiusX, radiusY, alpha, blur, quality, BlurFilter];
   // Movement and hover refreshes do not change the token's local shadow geometry.
   if (state.drawState && drawState.every((value, index) => value === state.drawState[index])) return;
+  const canCache = "cacheAsBitmap" in shadow;
+  if (canCache) shadow.cacheAsBitmap = false;
   shadow.clear();
   shadow.visible = alpha > 0;
   shadow.alpha = 1;
@@ -113,6 +132,13 @@ export function refreshTokenShadow(token) {
       }
     }
   }
+  if (canCache && shadow.filters?.length) {
+    // Bake small blurred ellipses once; large shadows retain the normal filter path.
+    const cacheWidth = Math.ceil(radiusX * 2 + blur * 6);
+    const cacheHeight = Math.ceil(radiusY * 2 + blur * 6);
+    shadow.cacheAsBitmapResolution = 1;
+    shadow.cacheAsBitmap = cacheWidth * cacheHeight <= 65536;
+  }
   state.drawState = drawState;
 }
 
@@ -122,7 +148,10 @@ export function clearTokenShadows() {
 
 export function refreshTokenShadows() {
   if (!globalThis.canvas?.ready) return clearTokenShadows();
-  for (const token of new Set([...shadowTokens, ...(canvas.tokens?.placeables ?? [])])) refreshTokenShadow(token);
+  const values = readTokenShadowSettings();
+  if (!values) return clearTokenShadows();
+  const getValue = (key) => values[key];
+  for (const token of new Set([...shadowTokens, ...(canvas.tokens?.placeables ?? [])])) refreshTokenShadowWithSettings(token, getValue);
 }
 
 export function registerTokenShadowHooks() {

@@ -1,5 +1,12 @@
 <section class="mk-actors__inspector">
-  <form class="mk-actors__inspector-form">
+  <form class="mk-actors__inspector-form {{#if available}}mk-actors__shadow-form{{/if}}">
+    {{#if available}}
+      <div class="mk-actors__shadow-preview">
+        <span class="mk-actors__shadow-preview-label">{{previewLabel}}</span>
+        <canvas data-role="shadow-preview" width="480" height="220" role="img" aria-label="{{previewLabel}}"></canvas>
+        <p class="notes" data-role="shadow-preview-status">{{previewHint}}</p>
+      </div>
+    {{/if}}
     <div class="mk-actors__inspector-scroll">
       <p class="notes">{{hint}}</p>
       {{#if notice}}<p class="notes" role="status">{{notice}}</p>{{/if}}
@@ -13,8 +20,12 @@
               {{label}}
             </label>
             {{#unless isBoolean}}
-              <input id="mk-actors-shadow-{{key}}" name="{{key}}" type="number"
-                     value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}" required>
+              <div class="mk-actors__shadow-slider">
+                <input id="mk-actors-shadow-{{key}}" name="{{key}}Range" type="range" data-shadow-slider="{{key}}"
+                       value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}">
+                <input name="{{key}}" type="number" data-shadow-value="{{key}}" aria-label="{{label}}"
+                       value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}" required>
+              </div>
             {{/unless}}
           </div>
         {{/each}}

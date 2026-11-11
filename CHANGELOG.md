@@ -8,6 +8,13 @@ This project follows semantic versioning where practical:
 - `MINOR` versions add backwards-compatible features.
 - `PATCH` versions fix bugs or polish existing behavior.
 
+## 0.8.0 - 2026-11-11
+
+- Added sliders with linked numeric values and a live sample-token preview to Token Shadows settings. Preview adjustments remain unsaved until Save and Close.
+- Preserved unsaved shadow adjustments when reopening the settings window, prevented overlapping saves, and avoided a deprecated PIXI blur lookup. Added a regression check that damage refreshes leave token dimensions and texture scale unchanged.
+- Avoided gallery rebuilds for combat-only Actor updates, read shadow appearance settings once per Scene refresh, and cached small blurred shadows to avoid repeating blur passes every frame. Appearance changes invalidate the cache; large shadows use the normal filter path, and removing shadows releases cached textures.
+- Added `npm run build` to validate and package the module locally before publishing through GitHub Actions.
+
 ## 0.7.0 - 2026-11-11
 
 - Added a standalone token-shadow renderer adapted from MK Shadowdark, with MK Actors-owned world settings and no required module or game system. Shadows are opt-in, follow tokens, clean up on Scene teardown, and yield to MK Shadowdark when its renderer is already enabled.

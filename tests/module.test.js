@@ -44,10 +44,29 @@ globalThis.ui = {
 const { MKActorsApi } = await import("../scripts/api.js");
 const { MKActorsApp } = await import("../scripts/gallery-app.js");
 const { MKTokenPortraitEditor } = await import("../scripts/token-portrait-editor.js");
-const { addSceneControlButton, ensurePortraitSyncedToTokenImage } = await import("../scripts/hooks.js");
+const { addSceneControlButton, ensurePortraitSyncedToTokenImage, scheduleActorGalleryRefresh } = await import("../scripts/hooks.js");
 const { resolveActor } = await import("../scripts/documents.js");
 const { resolveFilePickerClass } = await import("../scripts/file-picker.js");
 const { registerSettings } = await import("../scripts/settings.js");
+
+test("combat statistics keep the gallery cache while card and permission changes refresh it", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const refresh = t.mock.method(MKActorsApi, "refresh", () => null);
+  for (const changes of [{ system: { hp: 5 } }, { "system.hp": 4 }, { effects: [] }, { flags: { condition: "hurt" } }]) {
+    scheduleActorGalleryRefresh({}, changes);
+    t.mock.timers.tick(100);
+  }
+  assert.equal(refresh.mock.callCount(), 0);
+  for (const changes of [{ name: "Renamed" }, { img: "new.webp" }, { type: "npc" }, { folder: "new" },
+    { ownership: { default: 1 } }, { "ownership.user": 2 }, { "prototypeToken.texture.src": "token.webp" }]) {
+    scheduleActorGalleryRefresh({}, changes);
+    // Damage must not keep postponing a pending card update.
+    scheduleActorGalleryRefresh({}, { system: { hp: 1 } });
+    t.mock.timers.tick(100);
+  }
+  assert.equal(refresh.mock.callCount(), 7);
+  assert.deepEqual(refresh.mock.calls[0].arguments, [{ open: false }]);
+});
 
 test("token shadow entries remain visible to GMs when MK Shadowdark is unavailable", (t) => {
   const priorModules = game.modules;

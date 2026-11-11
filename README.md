@@ -23,6 +23,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - The compact Sources header aligns with the search header at MK Scene Gallery's height, fills the sidebar width, and stays in place while the source list scrolls.
 - Render large result sets in batches while loading Actor compendium indexes concurrently.
 - Reuse folder paths and type/source options while browsing cached Actors, and batch Actor Editor preview redraws to the display's animation frames.
+- Keep gallery results cached during HP, resource, effect, and other combat-statistic updates; card, source, and permission changes still refresh the gallery.
 - Keep the current gallery scroll position when loading more Actor cards.
 - Show each Actor as a square 1:1 portrait card with only its name as visible metadata.
 - Use MK Scene Gallery's dark glass and amber styling, with a joined Sources sidebar, compact action bar, and a search header showing the selected source. Result counts stay in the footer.
@@ -60,9 +61,13 @@ The gallery opens with **All Types**, showing every accessible Actor type, inclu
 
 ## Token shadows
 
-GMs can open **Token shadows** using the half-circle button at the start of the gallery toolbar, Actor Editor's sliders button, or **Configure Settings > Module Settings > MK Actors > Configure token shadows**. Turn on **Enable token shadows**, adjust size, vertical offset, opacity, blur strength, and blur quality, then click **Save and Close**. Shadows are off by default.
+GMs can open **Token shadows** using the half-circle button at the start of the gallery toolbar, Actor Editor's sliders button, or **Configure Settings > Module Settings > MK Actors > Configure token shadows**. Turn on **Enable token shadows**, then use the sliders or their linked number fields to adjust size, vertical offset, opacity, blur strength, and blur quality. A live preview stays above the controls and shows the shadow beneath a sample token using the same renderer as Scene tokens. Preview changes stay local to the window until you click **Save and Close**. Shadows are off by default.
 
 MK Actors draws the shadows itself and stores its own world settings. No other module or particular game system is required. Settings affect all Scene tokens, including existing tokens and new Actor drops, and update every viewing client. They save independently of Actor Editor. Shadows follow token movement and resizing and are removed when disabled, when tokens are deleted, or when the Scene is torn down. Actor documents and token textures are unchanged.
+
+Opening Token shadows again brings the existing window forward and keeps your unsaved adjustments. Controls are disabled while a save is pending to prevent overlapping saves, and become available again if saving fails.
+
+Unchanged blurred shadows reuse their rendered appearance while tokens move. Resizing or changing shadow settings refreshes that appearance. Cache size is limited for large shadows, and cached graphics are released when shadows are removed. A full Scene refresh reads shared appearance settings once for all tokens.
 
 If MK Shadowdark is also active with its own Token Shadows enabled, MK Actors yields to that renderer to avoid overlapping shadows. Turn off MK Shadowdark's Token Shadows option to use MK Actors' appearance settings. The two modules keep separate preferences.
 
@@ -143,6 +148,7 @@ mk-actors/
   scripts/settings.js
   scripts/token-shadow-controls.js
   scripts/token-shadow-settings.js
+  scripts/token-shadow-preview.js
   scripts/token-shadows.js
   scripts/file-picker.js
   scripts/token-portrait-editor.js
@@ -155,7 +161,9 @@ mk-actors/
   tests/module.test.js
   tests/release.test.js
   tests/token-shadow-controls.test.js
+  tests/token-shadow-preview.test.js
   tests/token-shadows.test.js
+  tools/build.mjs
   tools/prepare-release.mjs
   docs/UI_STYLE_RULES.md
 ```
@@ -167,6 +175,8 @@ Run the dependency-free Node test suite with:
 ```text
 npm test
 ```
+
+Build and validate the release archive with `npm run build`. The build runs tests and syntax checks, validates the version and release notes, and writes `dist/mk-actors.zip` and `dist/module.json`. Windows uses its built-in archive support; other platforms need the `zip` command.
 
 ## Publishing a release
 

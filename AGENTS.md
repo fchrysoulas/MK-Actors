@@ -26,6 +26,7 @@ scripts/main.js          Module entry point and hook registration
 scripts/settings.js      Settings and keybinding registration
 scripts/token-shadow-controls.js Standalone Token Shadows settings actions
 scripts/token-shadow-settings.js ApplicationV2 Token Shadows settings window
+scripts/token-shadow-preview.js Live Token Shadows preview and linked slider controls
 scripts/token-shadows.js Standalone token shadow renderer and canvas lifecycle hooks
 scripts/file-picker.js   Foundry FilePicker compatibility resolver
 scripts/token-preview.js Interactive token image preview and fitting geometry
