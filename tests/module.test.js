@@ -47,6 +47,37 @@ const { MKTokenPortraitEditor } = await import("../scripts/token-portrait-editor
 const { addSceneControlButton, ensurePortraitSyncedToTokenImage } = await import("../scripts/hooks.js");
 const { resolveActor } = await import("../scripts/documents.js");
 const { resolveFilePickerClass } = await import("../scripts/file-picker.js");
+const { registerSettings } = await import("../scripts/settings.js");
+
+test("MK Shadowdark shortcuts require an active module and restrict world settings to GMs", (t) => {
+  const priorModules = game.modules;
+  const priorSettings = game.settings;
+  const priorUser = game.user;
+  t.after(() => { game.modules = priorModules; game.settings = priorSettings; game.user = priorUser; });
+  game.user = { ...priorUser, isGM: true };
+  game.modules = new Map();
+  const menus = new Map();
+  game.settings = {
+    get: () => false,
+    register() {},
+    registerMenu: (module, key, config) => menus.set(`${module}.${key}`, config)
+  };
+  registerSettings();
+  assert.equal(menus.has("mk-actors.tokenShadows"), false);
+  game.modules.set("mk-shadowdark", { active: true });
+  registerSettings();
+  assert.equal(menus.get("mk-actors.tokenShadows").restricted, true);
+  assert.equal(menus.get("mk-actors.openGallery").restricted, false);
+
+  game.settings.menus = new Map([["mk-shadowdark.tokenShadowsSettings", { type: class {} }]]);
+  const editor = new MKTokenPortraitEditor({ uuid: "Actor.shadow-test" });
+  assert.equal(editor.buildTokenEditorData(editor.actor).canConfigureTokenShadows, true);
+  game.user.isGM = false;
+  assert.equal(editor.buildTokenEditorData(editor.actor).canConfigureTokenShadows, false);
+  game.user.isGM = true;
+  game.modules.clear();
+  assert.equal(editor.buildTokenEditorData(editor.actor).canConfigureTokenShadows, false);
+});
 
 function deferred() {
   let resolve;

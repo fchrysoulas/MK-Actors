@@ -10,6 +10,10 @@ This project follows semantic versioning where practical:
 
 ## Unreleased
 
+## 0.6.0 - 2026-11-11
+
+- Added optional GM shortcuts in Actor Editor and module settings to MK Shadowdark's shared Token Shadows controls, affecting all Scene tokens without duplicating settings or shadow rendering.
+
 ## 0.5.0 - 2026-11-11
 
 - Replaced the local PowerShell release script with a GitHub Actions workflow that validates, packages, and publishes version tags, with manual draft publishing available.

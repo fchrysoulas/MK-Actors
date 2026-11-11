@@ -42,6 +42,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Client-side card size setting.
 - Client-side debug mode for tracing module actions in the browser console.
 - World setting to sync Actor portrait changes to prototype token images.
+- Optional GM shortcut to MK Shadowdark's shared Token Shadows controls from Actor Editor and MK Actors module settings, when MK Shadowdark is active.
 
 ## System-agnostic filtering
 
@@ -56,6 +57,12 @@ Foundry systems use different Actor type IDs. Examples:
 The gallery opens with **All Types**, showing every accessible Actor type, including player-character types. The type selector lists every type found in enabled world and compendium sources. Select a specific type to show its Actors, or **All Types** to show every type again. Search and source filters still apply, and source settings and permissions are respected.
 
 **Clear** restores All Types and clears search and source filters. Actor type filtering is controlled directly by the selector; separate included and excluded type settings are no longer used.
+
+## Optional MK Shadowdark token shadows
+
+With **MK Shadowdark** active, GMs can open **Token shadows (MK Shadowdark)** from Actor Editor using its sliders button, or from **Configure Settings > Module Settings > MK Actors > Configure token shadows**. In that window, enable **Token Shadows | Enabled** and adjust shadow size, offset, opacity, and blur.
+
+These are MK Shadowdark's existing world settings: they affect all Scene tokens, including tokens dragged from MK Actors. They are not per-Actor options and save through MK Shadowdark's settings window independently of Actor Editor's **Save and Close**. MK Shadowdark handles drawing and refreshing the shadows. MK Actors does not duplicate its settings or renderer, and the Actor Editor shortcut is hidden for non-GMs and when compatible Token Shadows controls are unavailable. MK Shadowdark is optional; other systems can continue using the gallery without it.
 
 ## How to open the gallery
 
@@ -132,6 +139,7 @@ mk-actors/
   scripts/hooks.js
   scripts/main.js
   scripts/settings.js
+  scripts/shadowdark-integration.js
   scripts/file-picker.js
   scripts/token-portrait-editor.js
   scripts/token-preview.js
@@ -141,6 +149,7 @@ mk-actors/
   templates/token-portrait-editor.hbs
   tests/module.test.js
   tests/release.test.js
+  tests/shadowdark-integration.test.js
   tools/prepare-release.mjs
   docs/UI_STYLE_RULES.md
 ```
