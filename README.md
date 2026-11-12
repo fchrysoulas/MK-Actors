@@ -14,6 +14,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 ## Features
 
 - Browse world Actors.
+- Import a Foundry Actor JSON as a new world Actor and choose its portrait and token image before importing.
 - Browse visible Actor compendiums.
 - Search by name, Actor type, source, or compendium ID.
 - Filter by any Actor type found in accessible sources, including player-character types, or select All Types.
@@ -43,7 +44,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Client-side card size setting.
 - Client-side debug mode for tracing module actions in the browser console.
 - World setting to sync Actor portrait changes to prototype token images.
-- Standalone token shadows with GM controls for size, offset, opacity, and blur, available from the gallery toolbar, Actor Editor, and MK Actors module settings. Works with every game system without additional modules.
+- Standalone token shadows with GM controls for size, offset, opacity, and blur, available from the gallery toolbar and MK Actors module settings. Works with every game system without additional modules.
 
 ## System-agnostic filtering
 
@@ -59,15 +60,23 @@ The gallery opens with **All Types**, showing every accessible Actor type, inclu
 
 **Clear** restores All Types and clears search and source filters. Actor type filtering is controlled directly by the selector; separate included and excluded type settings are no longer used.
 
+## Import an Actor
+
+Click **Import Actor** (the file-import icon) in the gallery toolbar, choose a Foundry Actor JSON export, and review its image preview. Use **Browse image** to select or upload an image through Foundry's file browser, or enter an image path. The chosen image sets both the Actor portrait and prototype token image. Leave the image path blank to preserve the images in the JSON.
+
+Click **Import Actor** to create a new world Actor with the exported character data, embedded Items, and effects. The gallery switches to World Actors and clears its filters after importing. Existing Actors are not overwritten; cancelling creates nothing. The button is available to users with Foundry's Actor creation permission.
+
+Use an Actor export compatible with the current game system. MK Actors checks the exported system and Actor type when available and uses Foundry's native document migration and validation. It does not convert characters between game systems. Images referenced by the JSON must be accessible in this Foundry installation or replaced using the image browser.
+
 ## Token shadows
 
-GMs can open **Token shadows** using the half-circle button at the start of the gallery toolbar, Actor Editor's sliders button, or **Configure Settings > Module Settings > MK Actors > Configure token shadows**. Turn on **Enable token shadows**, then use the sliders or their linked number fields to adjust size, vertical offset, opacity, blur strength, and blur quality. A live preview stays above the controls and shows the shadow beneath a sample token using the same renderer as Scene tokens. Preview changes stay local to the window until you click **Save and Close**. Shadows are off by default.
+GMs can open **Token shadows** using the half-circle button at the start of the gallery toolbar or **Configure Settings > Module Settings > MK Actors > Configure token shadows**. Turn on **Enable token shadows**, then use the sliders or their linked number fields to adjust size, vertical offset, opacity, blur strength, and blur quality. A live preview stays above the controls and shows the shadow beneath a sample token using the same renderer as Scene tokens. Preview changes stay local to the window until you click **Save and Close**. Shadows are off by default.
 
 MK Actors draws the shadows itself and stores its own world settings. No other module or particular game system is required. Settings affect all Scene tokens, including existing tokens and new Actor drops, and update every viewing client. They save independently of Actor Editor. Shadows follow token movement and resizing and are removed when disabled, when tokens are deleted, or when the Scene is torn down. Actor documents and token textures are unchanged.
 
 Opening Token shadows again brings the existing window forward and keeps your unsaved adjustments. Controls are disabled while a save is pending to prevent overlapping saves, and become available again if saving fails.
 
-Unchanged blurred shadows reuse their rendered appearance while tokens move. Resizing or changing shadow settings refreshes that appearance. Cache size is limited for large shadows, and cached graphics are released when shadows are removed. A full Scene refresh reads shared appearance settings once for all tokens.
+Shadows reuse their geometry and blur filters while tokens move and render directly through Foundry's canvas. Resizing or changing shadow settings refreshes their appearance, and graphics and filters are released when shadows are removed. Direct rendering avoids transparent bitmap caches that can make enabled shadows disappear. A full Scene refresh reads shared appearance settings once for all tokens.
 
 If MK Shadowdark is also active with its own Token Shadows enabled, MK Actors yields to that renderer to avoid overlapping shadows. Turn off MK Shadowdark's Token Shadows option to use MK Actors' appearance settings. The two modules keep separate preferences.
 
@@ -138,6 +147,8 @@ mk-actors/
   README.md
   lang/en.json
   scripts/actor-helpers.js
+  scripts/actor-import.js
+  scripts/actor-import-app.js
   scripts/api.js
   scripts/constants.js
   scripts/debug.js
@@ -156,9 +167,11 @@ mk-actors/
   scripts/window-drag.js
   styles/gallery.css
   templates/gallery.hbs
+  templates/actor-import.hbs
   templates/token-portrait-editor.hbs
   templates/token-shadow-settings.hbs
   tests/module.test.js
+  tests/actor-import.test.js
   tests/release.test.js
   tests/token-shadow-controls.test.js
   tests/token-shadow-preview.test.js

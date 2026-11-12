@@ -8,6 +8,12 @@ This project follows semantic versioning where practical:
 - `MINOR` versions add backwards-compatible features.
 - `PATCH` versions fix bugs or polish existing behavior.
 
+## 0.9.0 - 2026-11-12
+
+- Fixed missing token shadows caused by transparent bitmap caches in Foundry's canvas renderer. Shadows now render directly while retaining geometry and blur-filter reuse.
+- Added an Actor JSON import window with image selection and preview. Imports create a new world Actor using Foundry's native migrations and respect Actor creation permissions.
+- Removed the Token Shadows shortcut from Actor Editor; it remains available from the gallery toolbar and module settings.
+
 ## 0.8.0 - 2026-11-11
 
 - Added sliders with linked numeric values and a live sample-token preview to Token Shadows settings. Preview adjustments remain unsaved until Save and Close.

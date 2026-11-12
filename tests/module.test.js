@@ -68,7 +68,7 @@ test("combat statistics keep the gallery cache while card and permission changes
   assert.deepEqual(refresh.mock.calls[0].arguments, [{ open: false }]);
 });
 
-test("token shadow entries remain visible to GMs when MK Shadowdark is unavailable", (t) => {
+test("token shadow module settings remain available to GMs when MK Shadowdark is unavailable", (t) => {
   const priorModules = game.modules;
   const priorSettings = game.settings;
   const priorUser = game.user;
@@ -96,15 +96,6 @@ test("token shadow entries remain visible to GMs when MK Shadowdark is unavailab
   registerSettings();
   assert.equal(menus.get("mk-actors.tokenShadows").restricted, true);
   assert.equal(menus.get("mk-actors.openGallery").restricted, false);
-
-  game.settings.menus = new Map([["mk-shadowdark.tokenShadowsSettings", { type: class {} }]]);
-  const editor = new MKTokenPortraitEditor({ uuid: "Actor.shadow-test" });
-  assert.equal(editor.buildTokenEditorData(editor.actor).showTokenShadowSettings, true);
-  game.user.isGM = false;
-  assert.equal(editor.buildTokenEditorData(editor.actor).showTokenShadowSettings, false);
-  game.user.isGM = true;
-  game.modules.clear();
-  assert.equal(editor.buildTokenEditorData(editor.actor).showTokenShadowSettings, true);
 });
 
 test("the gallery exposes token shadow settings to GMs even with no Actors or MK Shadowdark", async (t) => {
@@ -118,6 +109,32 @@ test("the gallery exposes token shadow settings to GMs even with no Actors or MK
   assert.equal((await app.getData()).showTokenShadowSettings, true);
   game.user.isGM = false;
   assert.equal((await app.getData()).showTokenShadowSettings, false);
+});
+
+test("Actor import respects creation permissions, reuses its window, and reveals World Actors after importing", async (t) => {
+  const priorActors = game.actors;
+  const priorUser = game.user;
+  t.after(() => { game.actors = priorActors; game.user = priorUser; });
+  mockActorSources(t, async () => []);
+  game.user = { canCreate: false };
+  game.actors = { documentClass: class { static canUserCreate(user) { return user.canCreate; } } };
+  const gallery = new MKActorsApp();
+  assert.equal((await gallery.getData()).canImportActors, false);
+  assert.equal(await gallery.openActorImport(), null);
+  game.user.canCreate = true;
+  assert.equal((await gallery.getData()).canImportActors, true);
+  const app = await gallery.openActorImport();
+  assert.equal(await gallery.openActorImport(), app);
+  assert.equal(app.source, null);
+  gallery.filters = { search: "old search", type: "npc", source: "compendium:test.actors" };
+  gallery.rendered = true;
+  const render = t.mock.method(gallery, "render", async () => gallery);
+  await app.onImport({ uuid: "Actor.new" });
+  assert.deepEqual(gallery.filters, { search: "", type: "", source: "world" });
+  assert.equal(gallery.cache, null);
+  assert.equal(render.mock.callCount(), 1);
+  await app.close();
+  assert.equal(gallery.actorImportApp, null);
 });
 
 function deferred() {

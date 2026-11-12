@@ -1,0 +1,32 @@
+<section class="mk-actors__inspector" aria-label="{{localize 'MKACTORS.ImportActor'}}">
+  <form class="mk-actors__inspector-form">
+    <div class="mk-actors__inspector-scroll">
+      <div class="mk-actors__inspector-section">
+        <label for="mk-actors-import-json">{{localize 'MKACTORS.ActorJSONFile'}}</label>
+        <input id="mk-actors-import-json" name="actorJSON" type="file" accept=".json,application/json"
+               aria-describedby="mk-actors-import-hint" required>
+        <p id="mk-actors-import-hint" class="notes">{{localize 'MKACTORS.ImportActorHint'}}</p>
+        <p class="notes" data-role="import-status" aria-live="polite">{{localize 'MKACTORS.ImportActorSelectFile'}}</p>
+      </div>
+      <div class="mk-actors__inspector-section">
+        <label for="mk-actors-import-image">{{localize 'MKACTORS.ImagePath'}}</label>
+        <div class="mk-actors-token-editor__row">
+          <input id="mk-actors-import-image" name="imagePath" type="text"
+                 placeholder="{{localize 'MKACTORS.ImportActorImagePlaceholder'}}"
+                 aria-describedby="mk-actors-import-image-hint">
+          <button type="button" class="mk-actors-token-editor__browse" data-action="browse-import-image"
+                  title="{{localize 'MKACTORS.BrowseImage'}}" aria-label="{{localize 'MKACTORS.BrowseImage'}}">
+            <i class="fas fa-folder-open" aria-hidden="true"></i>
+          </button>
+        </div>
+        <p id="mk-actors-import-image-hint" class="notes">{{localize 'MKACTORS.ImportActorImageHint'}}</p>
+        <img class="mk-actors__import-preview" src="{{previewImage}}" data-role="import-preview"
+             alt="{{localize 'MKACTORS.ImportActorImagePreview'}}">
+      </div>
+    </div>
+    <footer class="mk-actors__inspector-footer">
+      <button type="button" data-action="cancel-import">{{localize 'MKACTORS.Cancel'}}</button>
+      <button type="submit" disabled><i class="fas fa-file-import" aria-hidden="true"></i>{{localize 'MKACTORS.ImportActor'}}</button>
+    </footer>
+  </form>
+</section>

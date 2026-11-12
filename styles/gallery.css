@@ -851,6 +851,20 @@
   user-select: none;
 }
 
+.mk-actors-import-app .mk-actors__import-preview {
+  width: 100%;
+  height: 190px;
+  object-fit: contain;
+  border: 1px solid var(--mk-actors-border-soft);
+  border-radius: var(--mk-actors-radius-sm);
+  background: var(--mk-actors-bg);
+}
+
+.mk-actors-import-app input[type="file"] {
+  height: auto;
+  padding: 6px;
+}
+
 .mk-actors__inspector-preview img {
   position: absolute;
   display: block;

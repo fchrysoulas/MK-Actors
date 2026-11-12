@@ -12,6 +12,8 @@ import { MKTokenPortraitEditor } from "./token-portrait-editor.js";
 import { localize } from "./utils.js";
 import { prepareWindowDrag } from "./window-drag.js";
 import { openTokenShadowSettings } from "./token-shadow-controls.js";
+import { canImportActors } from "./actor-import.js";
+import { MKActorImportApp } from "./actor-import-app.js";
 
 export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -47,6 +49,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.sourcesCollapsed = false;
     this.favoriteActors = this.readFavorites();
     this.savingFavorite = false;
+    this.actorImportApp = null;
   }
 
   get title() {
@@ -137,6 +140,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       sourcesToggleLabel: localize(this.sourcesCollapsed ? "ExpandSources" : "CollapseSources"),
       state: this.filters,
       cardSize,
+      canImportActors: canImportActors(),
       showTokenShadowSettings: game.user?.isGM === true,
       warnings: this.warnings,
       emptyMessage: localize(emptyFavorites ? "NoFavorites" : "NoActors")
@@ -146,6 +150,13 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   activateListeners(html) {
     const root = html?.[0] || html;
     debugLog("Activating gallery listeners");
+
+    root.querySelector?.("[data-action='import-actor']")?.addEventListener("click", () => {
+      void this.openActorImport().catch((error) => {
+        console.error(`${MODULE_ID} | Could not open Actor import.`, error);
+        ui.notifications.error(game.i18n.format("MKACTORS.ImportActorFailed", { message: error.message }));
+      });
+    });
 
     root.querySelector?.("[data-action='toggle-sources']")?.addEventListener("click", () => this.toggleSources(root));
     root.querySelector?.("[data-action='configure-token-shadows']")?.addEventListener("click", () => {
@@ -689,6 +700,37 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
     const currentOffset = card.getBoundingClientRect().top - grid.getBoundingClientRect().top;
     grid.scrollTop += currentOffset - anchor.offset;
+  }
+
+  async openActorImport() {
+    if (!canImportActors()) {
+      ui.notifications.warn(localize("CannotImportActor"));
+      return null;
+    }
+    if (this.actorImportApp) {
+      await this.actorImportApp.maximize();
+      this.actorImportApp.bringToFront();
+      return this.actorImportApp;
+    }
+    const app = new MKActorImportApp({
+      onImport: async () => {
+        clearTimeout(this.searchRenderTimer);
+        this.filters = { search: "", type: "", source: "world" };
+        this.visibleLimit = GALLERY_PAGE_SIZE;
+        this.invalidateCache();
+        this.pendingGridAnchor = null;
+        if (this.rendered) await this.render(false);
+      },
+      onClose: () => { this.actorImportApp = null; }
+    });
+    this.actorImportApp = app;
+    try {
+      await app.render(true);
+      return app;
+    } catch (error) {
+      this.actorImportApp = null;
+      throw error;
+    }
   }
 
   async openTokenPortraitEditor(uuid) {

@@ -36,20 +36,6 @@
         <p id="{{id}}-preview-hint" class="notes">{{editor.labels.previewHint}}</p>
       </div>
 
-      {{#if editor.showTokenShadowSettings}}
-        <div class="mk-actors__inspector-section">
-          <div class="mk-actors-token-editor__preview-heading">
-            <span>{{editor.labels.tokenShadows}}</span>
-            <button type="button" class="mk-actors-token-editor__reset"
-                    data-action="configure-token-shadows"
-                    title="{{editor.labels.configureTokenShadows}}" aria-label="{{editor.labels.configureTokenShadows}}">
-              <i class="fas fa-sliders" aria-hidden="true"></i>
-            </button>
-          </div>
-          <p class="notes">{{editor.labels.tokenShadowsHint}}</p>
-        </div>
-      {{/if}}
-
       <div class="mk-actors__inspector-section">
         <label for="{{id}}-portrait-img">{{editor.labels.imagePath}}</label>
         <div class="mk-actors-token-editor__row">

@@ -132,13 +132,7 @@ export function drawTokenShadow(state, { x, y, radiusX, radiusY, alpha, blur, qu
       }
     }
   }
-  if (canCache && shadow.filters?.length) {
-    // Bake small blurred ellipses once; large shadows retain the normal filter path.
-    const cacheWidth = Math.ceil(radiusX * 2 + blur * 6);
-    const cacheHeight = Math.ceil(radiusY * 2 + blur * 6);
-    shadow.cacheAsBitmapResolution = 1;
-    shadow.cacheAsBitmap = cacheWidth * cacheHeight <= 65536;
-  }
+  // Foundry's canvas can bake filtered Graphics as transparent bitmaps; draw them directly.
   state.drawState = drawState;
 }
 

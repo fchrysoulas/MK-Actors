@@ -77,20 +77,19 @@ test("movement reuses geometry and filters while resizing and setting changes re
   assert.equal(token.children.length, 1);
 });
 
-test("blurred shadows cache their pixels until appearance changes and cap cache size", (t) => {
+test("blurred shadows render directly while reusing geometry and releasing filters on removal", (t) => {
   const { token, values } = setup(t);
   refreshTokenShadow(token);
   const shadow = token.children[0];
-  assert.equal(shadow.cacheAsBitmap, true);
-  assert.equal(shadow.cacheAsBitmapResolution, 1);
+  assert.equal(shadow.cacheAsBitmap, false);
   const changes = [];
-  let cached = true;
+  let cached = false;
   Object.defineProperty(shadow, "cacheAsBitmap", { get: () => cached, set(value) { cached = value; changes.push(value); } });
   refreshTokenShadow(token);
   assert.deepEqual(changes, []);
   values.tokenShadowAlpha = 0.8;
   refreshTokenShadows();
-  assert.deepEqual(changes, [false, true]);
+  assert.deepEqual(changes, [false]);
   assert.equal(shadow.fill.alpha, 0.8);
   token.w = 3000;
   refreshTokenShadow(token);

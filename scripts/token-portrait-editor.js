@@ -5,7 +5,6 @@ import { resolveFilePickerClass } from "./file-picker.js";
 import { TokenImagePreview } from "./token-preview.js";
 import { localize, normalizeNumber } from "./utils.js";
 import { prepareWindowDrag } from "./window-drag.js";
-import { openTokenShadowSettings } from "./token-shadow-controls.js";
 
 export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -82,14 +81,10 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
       anchorX: prototypeToken?.texture?.anchorX ?? 0.5,
       anchorY: prototypeToken?.texture?.anchorY ?? 0.5,
       scale: prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
-      showTokenShadowSettings: game.user?.isGM === true,
       labels: {
         title: localize("TokenPortraitEditorTitle"),
         name: localize("Name"),
         nameHint: localize("ActorNameHint"),
-        tokenShadows: localize("TokenShadowSettings"),
-        configureTokenShadows: localize("ConfigureTokenShadows"),
-        tokenShadowsHint: localize("TokenShadowSettingsHint"),
         preview: localize("TokenPreview"),
         previewHint: localize("TokenPreviewHint"),
         previewControls: localize("TokenPreviewControls"),
@@ -118,11 +113,6 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
   activateListeners(html) {
     const root = html?.[0] || html;
     root.querySelector?.("[data-action='close-token-editor']")?.addEventListener("click", () => this.close());
-    root.querySelector?.("[data-action='configure-token-shadows']")?.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void openTokenShadowSettings();
-    });
     root.querySelector?.("[data-action='browse-token-image']")?.addEventListener(
       "click",
       this.onBrowseTokenImage.bind(this)

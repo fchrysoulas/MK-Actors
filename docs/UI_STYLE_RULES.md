@@ -348,22 +348,35 @@ Recommended state behavior:
   cancel a drag. Preview gestures remain unsaved until Save and Close is used.
   Close the editor after a successful save; keep it open if saving fails.
 - Notes are muted but retain readable contrast and adequate line height.
-- Keep the GM Token Shadows section and gallery toolbar shortcut available for
-  every game system. Open MK Actors' own settings window for its standalone
-  renderer. Explain that these world settings affect all Scene tokens and save
-  independently of Actor Editor. Keep controls hidden for players. When another
+- Keep GM Token Shadows controls in the gallery toolbar and module settings,
+  outside Actor Editor, for every game system. Open MK Actors' own settings
+  window for its standalone renderer. Explain that these world settings affect
+  all Scene tokens. Keep controls hidden for players. When another
   supported renderer is active, explain which renderer controls the appearance.
 - Token Shadows uses sliders paired with numeric inputs and a fixed preview
   above the scrolling controls. Use the same shadow geometry and blur as Scene
   tokens, keep draft changes inside the window, and release preview resources
   when the window closes or rerenders.
-- Cache small blurred token shadows between appearance changes, bound the cache
-  pixel area, and release cached textures on removal. Share one settings snapshot
+- Reuse token shadow geometry and blur filters between appearance changes. Render
+  directly to avoid transparent bitmap caches and release resources on removal.
+  Share one settings snapshot
   across Scene refreshes. Combat-only Actor updates must not rebuild the gallery.
 - At narrow widths, paired fields stack if their usable input width would fall
   below roughly `120px`.
 - Native validity, labels, keyboard access, and Foundry v13-v14 behavior take
   priority over visual styling.
+
+## Actor Import
+
+- Offer an icon-only Import Actor action in the gallery toolbar to users with
+  Actor creation permission. Recheck permission when the import is submitted.
+- Use a separate compact ApplicationV2 window with a local JSON file input,
+  an optional image path and Foundry image browser, and an image preview.
+- Create a new world Actor only when Import Actor is submitted. Keep exported
+  images unless the user chooses a replacement for both portrait and token.
+- Preserve the draft on failure, prevent overlapping imports, and refresh the
+  gallery to World Actors after success. Import compatible Actor exports using
+  Foundry's native migrations without assuming a particular game system.
 
 ## Scrollbars
 
