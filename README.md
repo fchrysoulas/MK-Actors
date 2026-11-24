@@ -13,47 +13,16 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 
 ## Features
 
-- Browse world Actors.
-- Import a Foundry Actor JSON as a new world Actor and choose its portrait and token image before importing.
-- Browse visible Actor compendiums.
-- Toggle Actor compendiums with the book button in the gallery's top bar. The amber state includes compendiums; turning it off browses world Actors only. This preference is saved per client and respects the module's world setting for including compendiums and each user's access.
-- Search by name, Actor type, source, or compendium ID.
-- Filter by any Actor type found in accessible sources, including player-character types, or select All Types.
-- Filter by source from a left tree view with World folders, unfiled World actors, and Actor compendiums.
-- Star an Actor card to add it to **Favorites**, then select **Favorites** in Sources to browse starred world and compendium Actors together. Click its star again to remove it. Favorites stay saved on this Foundry client after reopening or reloading and work with search, type filtering, and the collapsed Sources rail.
-- Restore search, Actor type, selected source, and Sources sidebar state after reopening or reloading on this Foundry client. If a saved type or source is no longer available, its filter returns to All Types or All Sources.
-- Collapse the Sources sidebar to a compact icon rail using its small header toggle to give Actor cards more room. Hover over an icon to see the source name. Source filtering and the selected-source highlight remain available.
-- The compact Sources header aligns with the search header at MK Scene Gallery's height, fills the sidebar width, and stays in place while the source list scrolls.
-- Render large result sets in batches while loading up to four Actor compendium indexes concurrently per gallery load. Refreshing stops queued requests and skips processing obsolete index results.
-- Browse very large Actor libraries without hitting JavaScript argument-count limits while combining sources.
-- Reuse folder paths and type/source options while browsing cached Actors, and batch Actor Editor preview redraws to the display's animation frames.
-- Cancel pending search redraws when the gallery closes. Release shadow preview graphics and renderers when their window closes or rerenders, including failed initialization and cleanup paths; one failed Scene shadow cleanup does not block the others.
-- Keep gallery results cached during HP, resource, effect, and other combat-statistic updates; card, source, and permission changes still refresh the gallery.
-- Keep the current gallery scroll position when loading more Actor cards.
-- Show each Actor as a square 1:1 portrait card with only its name as visible metadata.
-- Use MK Scene Gallery's dark glass and amber styling, with a joined Sources sidebar, compact action bar, and a search header showing the selected source. Result counts stay in the footer.
-- Show portraits inside inset square frames without stretching or cropping them; Open Sheet sits in each card's top-right corner.
-- Use the same amber controls and token preview styling in Actor Editor.
-- Keep window movement and resizing responsive by isolating each window's rendering, avoiding blur over the Scene, skipping offscreen card painting, and simplifying effects while the title bar or resize handle is held. Window geometry follows the pointer without theme easing.
-- Move the gallery and Actor Editor without recalculating their layout on every drag frame. Their final positions are committed when the title bar is released; Escape cancels a move.
-- Keep the gallery's vertical scrollbar visible so card columns do not shift as results change.
-- Drag cards onto a Scene.
-- Drag from an Actor portrait as part of the card.
-- Double-click an Actor card to open its sheet.
-- Right-click an Actor card to open the **Actor Editor**, a separate, movable, resizable popup for its portrait image, token dimensions, fit mode, anchor, and scale.
-- Keep the Name field above the image preview, with all image and token settings in the right third of the editor. The editor opens wide enough for both columns and stacks them when the window is narrowed.
-- Width and Height stay side by side, as do the X and Y anchor fields. Hover over an Actor Editor setting to read its description; help text stays out of the layout and remains available to screen readers.
-- Show a small amber warning beside Image Path when an Actor Editor image fails to load. Hover over the warning for help. The preview uses a placeholder while keeping your entered path for correction; choosing or entering a new path retries the preview.
-- Edit **Name** in Actor Editor to update the Actor name and prototype token name together when you click **Save and Close**.
-- **Save and Close** is disabled while saving to prevent duplicate updates, including repeated Enter presses. If saving fails, the editor keeps your draft and enables the button so you can retry.
-- Position the image visually in the Actor Editor's token preview: drag it to set the anchors, and drag its corner handle or use the mouse wheel to set the scale ratio. Numeric controls stay in sync. Arrow keys move the image; plus and minus adjust scale. Click **Save and Close** to save the changes and close the editor. If saving fails, the editor stays open so you can retry.
-- Rotate the image using its round arrow handle or the **Rotation (Degrees)** field. Hold Shift while dragging to snap to 15-degree angles. The bracket keys rotate by one degree, or 15 degrees with Shift; Escape cancels an active drag. Reset restores position, scale, and angle. Rotation saves to the prototype token for new Scene drops; changing the angle enables artwork rotation if it was locked.
-- Keep the gallery at its current scroll position when the editor opens, applies changes, or closes. Left-clicking does not open the editor.
-- Open an Actor sheet from the gallery.
-- Client-side card size setting.
-- Client-side debug mode for tracing module actions in the browser console.
-- World setting to sync Actor portrait changes to prototype token images.
-- Standalone token shadows with GM controls for size, offset, opacity, and blur, available from the gallery toolbar and MK Actors module settings. Works with every game system without additional modules.
+- **Actor gallery:** browse world Actors and accessible compendiums as portrait cards.
+- **Search and filters:** find Actors by name, type, source, world folder, or compendium.
+- **Favorites:** star Actors for quick access across world and compendium sources.
+- **Saved preferences:** remember filters, compendium inclusion, and the collapsible Sources sidebar after reload.
+- **Quick actions:** drag Actors onto a Scene, double-click to open sheets, or right-click for Actor Editor.
+- **Actor Editor:** edit names and artwork, and adjust token dimensions, fit, anchors, scale, and rotation with an interactive preview.
+- **Editor feedback:** setting tooltips, image-load warnings, and failed-save recovery keep editing clear and predictable.
+- **Actor import:** create world Actors from Foundry JSON with optional portrait and token image selection.
+- **Token shadows:** adjust size, offset, opacity, and blur using GM controls with a live preview.
+- **Responsive browsing:** load large libraries in batches, preserve scroll position, and customize card size.
 
 ## System-agnostic filtering
 
