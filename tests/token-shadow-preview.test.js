@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getEventListeners } from "node:events";
 import { TOKEN_SHADOW_SETTINGS } from "../scripts/constants.js";
 import { TokenShadowPreview } from "../scripts/token-shadow-preview.js";
 
-function setup(t, withRenderer = true) {
+function setup(t, withRenderer = true, configure = () => {}) {
   const previous = Object.fromEntries(["PIXI", "game", "requestAnimationFrame", "cancelAnimationFrame"].map((key) => [key, globalThis[key]]));
   const frames = new Map();
   let nextFrame = 0;
@@ -14,7 +15,9 @@ function setup(t, withRenderer = true) {
     i18n: { localize: (key) => key },
     settings: { get: () => false, set: () => assert.fail("A preview must not persist settings") }
   };
+  const graphics = [];
   class Graphics {
+    constructor() { graphics.push(this); }
     destroyCount = 0;
     lineStyle() { return this; }
     drawRect() { return this; }
@@ -46,6 +49,7 @@ function setup(t, withRenderer = true) {
     destroy() { this.destroyCount++; }
   }
   globalThis.PIXI = withRenderer ? { Graphics, Container, Renderer, BlurFilter } : undefined;
+  configure(globalThis.PIXI);
   const inputs = new Map();
   for (const field of TOKEN_SHADOW_SETTINGS) {
     inputs.set(field.key, { value: String(field.default), checked: field.default, validity: { valid: true },
@@ -69,7 +73,7 @@ function setup(t, withRenderer = true) {
   };
   const flush = () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach((callback) => callback()); };
   t.after(() => { preview.destroy(); Object.assign(globalThis, previous); });
-  return { preview, inputs, input, flush, frames, status, canvas };
+  return { preview, inputs, input, flush, frames, status, canvas, graphics, form };
 }
 
 test("sliders and numeric values update an isolated preview with the Scene renderer", (t) => {
@@ -124,6 +128,54 @@ test("closing a preview cancels drawing, removes input listeners, and frees grap
   assert.equal(filter.destroyCount, 1);
   assert.equal(shadowState.shadow.filters, null);
   assert.ok(stage.children.every((child) => child.destroyCount === 1));
+});
+
+test("repeated shadow preview lifecycles release all renderers and input listeners", (t) => {
+  const { preview, form, input, frames, graphics } = setup(t);
+  preview.destroy();
+  for (let cycle = 0; cycle < 50; cycle++) {
+    const current = new TokenShadowPreview(form);
+    const { renderer, shadowState } = current;
+    assert.equal(getEventListeners(form, "input").length, 1);
+    input("tokenShadowBlurRange", 8);
+    assert.equal(frames.size, 1);
+    current.destroy();
+    assert.equal(frames.size, 0);
+    assert.equal(getEventListeners(form, "input").length, 0);
+    assert.equal(renderer.destroyCount, 1);
+    assert.equal(shadowState.blurFilter.destroyCount, 1);
+  }
+  assert.ok(graphics.every((graphic) => graphic.destroyCount === 1));
+});
+
+test("failed graphics initialization releases every allocated preview graphic", (t) => {
+  const { preview, canvas, graphics } = setup(t, true, (pixi) => {
+    pixi.Graphics.prototype.drawCircle = () => { throw new Error("Preview initialization failed"); };
+  });
+  assert.equal(canvas.hidden, true);
+  assert.equal(preview.renderer, null);
+  assert.equal(graphics.length, 3);
+  assert.ok(graphics.every((graphic) => graphic.destroyCount === 1));
+});
+
+test("a failed filter cleanup cannot retain the renderer or interrupt the rest of teardown", (t) => {
+  const { preview, input, frames, graphics } = setup(t);
+  const { renderer, shadowState } = preview;
+  t.mock.method(shadowState.blurFilter, "destroy", () => { throw new Error("Filter already disposed"); });
+  Object.defineProperty(shadowState.shadow, "filters", {
+    get: () => null,
+    set: () => { throw new Error("Graphics filter state already disposed"); }
+  });
+  input("tokenShadowBlurRange", 8);
+  assert.doesNotThrow(() => preview.destroy());
+  assert.equal(frames.size, 0);
+  assert.equal(renderer.destroyCount, 1);
+  assert.ok(graphics.every((graphic) => graphic.destroyCount === 1));
+  assert.equal(preview.renderer, null);
+  assert.equal(preview.stage, null);
+  assert.equal(preview.shadowState, null);
+  preview.destroy();
+  assert.equal(renderer.destroyCount, 1);
 });
 
 test("sliders still synchronize when a graphics context cannot be created", (t) => {

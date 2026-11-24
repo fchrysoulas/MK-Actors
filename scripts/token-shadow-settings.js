@@ -30,6 +30,8 @@ export class MKTokenShadowSettings extends foundry.applications.api.ApplicationV
   }
 
   _replaceHTML(result, content) {
+    this.shadowPreview?.destroy();
+    this.shadowPreview = null;
     content.innerHTML = result;
   }
 

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getEventListeners } from "node:events";
 
 import { canModifyActor, canViewActor } from "../scripts/actor-helpers.js";
 import { normalizeNumber } from "../scripts/utils.js";
@@ -91,6 +92,11 @@ test("token shadow module settings remain available to GMs when MK Shadowdark is
   assert.equal(definitions.get("tokenShadowWidthFactor").default, 0.75);
   assert.deepEqual(definitions.get("tokenShadowAlpha").range, { min: 0, max: 1, step: 0.05 });
   assert.equal(typeof definitions.get("tokenShadowBlur").onChange, "function");
+  assert.equal(definitions.get("browsingPreferences").scope, "client");
+  assert.equal(definitions.get("browsingPreferences").config, false);
+  assert.equal(definitions.get("browsingPreferences").type, Object);
+  assert.deepEqual(definitions.get("browsingPreferences").default,
+    { search: "", type: "", source: "", sourcesCollapsed: false });
   assert.equal(menus.get("mk-actors.tokenShadows").restricted, true);
   game.modules.set("mk-shadowdark", { active: true });
   registerSettings();
@@ -180,6 +186,7 @@ function mockTokenPreview() {
   const captured = new Set();
   const stage = node({
     clientWidth: 400, clientHeight: 240, focus() {},
+    getBoundingClientRect: () => ({ left: 20, top: 30, width: 400, height: 240 }),
     classList: { add() {}, remove() {} },
     setPointerCapture: (id) => captured.add(id),
     hasPointerCapture: (id) => captured.has(id),
@@ -189,16 +196,19 @@ function mockTokenPreview() {
   const frame = node();
   const handle = node();
   handle.contains = (target) => target === handle;
+  const rotationHandle = node();
+  rotationHandle.contains = (target) => target === rotationHandle;
   const reset = node();
   const inputs = Object.fromEntries(Object.entries({
     portraitImg: "portrait.webp", tokenWidth: "1", tokenHeight: "1", tokenFit: "height",
-    tokenAnchorX: "0.5", tokenAnchorY: "0.5", tokenScale: "1", tokenScaleRange: "1"
+    tokenAnchorX: "0.5", tokenAnchorY: "0.5", tokenScale: "1", tokenScaleRange: "1", tokenRotation: "0"
   }).map(([name, value]) => [name, { value }]));
   const selectors = {
     "[data-role='token-preview-stage']": stage,
     "[data-role='token-editor-preview']": image,
     "[data-role='token-preview-frame']": frame,
     "[data-action='scale-token-preview']": handle,
+    "[data-action='rotate-token-preview']": rotationHandle,
     "[data-action='reset-token-preview']": reset,
     ...Object.fromEntries(Object.entries(inputs).map(([name, input]) => [`[name='${name}']`, input]))
   };
@@ -207,7 +217,7 @@ function mockTokenPreview() {
   const pointer = (target, x, y, pointerId = 1) => ({
     target, clientX: x, clientY: y, pointerId, button: 0, preventDefault() {}, stopPropagation() {}
   });
-  return { form, stage, image, frame, handle, reset, inputs, preview, pointer, captured };
+  return { form, stage, image, frame, handle, rotationHandle, reset, inputs, preview, pointer, captured };
 }
 
 test("token preview matches Foundry fit modes and texture anchors", () => {
@@ -295,8 +305,59 @@ test("token preview resize, wheel, reset, and numeric inputs stay in sync", (t) 
   assert.equal(inputs.tokenScale.value, "1");
 });
 
-test("Save and Close saves anchors and scale from visual token preview gestures", async (t) => {
-  const { preview, form, image, handle, inputs, pointer } = mockTokenPreview();
+test("rotation handles wrap angles, snap, cancel, and synchronize with numeric controls", (t) => {
+  const { preview, rotationHandle, image, inputs, form, pointer, captured, reset } = mockTokenPreview();
+  t.after(() => preview.destroy());
+  preview.startDrag(pointer(rotationHandle, 220, 90));
+  preview.moveDrag(pointer(rotationHandle, 280, 150, 2));
+  assert.equal(inputs.tokenRotation.value, "0");
+  preview.moveDrag(pointer(rotationHandle, 280, 150));
+  assert.equal(inputs.tokenRotation.value, "90");
+  assert.equal(image.style.transform, "rotate(90deg)");
+  preview.onKeyDown({ key: "Escape", preventDefault() {}, stopPropagation() {} });
+  assert.equal(inputs.tokenRotation.value, "0");
+  assert.equal(captured.size, 0);
+
+  preview.writeValues({ rotation: 350 });
+  const atAngle = (degrees) => pointer(rotationHandle,
+    220 + 70 * Math.cos(degrees * Math.PI / 180), 150 + 70 * Math.sin(degrees * Math.PI / 180));
+  preview.startDrag(atAngle(170));
+  preview.moveDrag(atAngle(-170));
+  assert.equal(inputs.tokenRotation.value, "10");
+  preview.moveDrag({ ...atAngle(-162), shiftKey: true });
+  assert.equal(inputs.tokenRotation.value, "15");
+  preview.finishDrag();
+  inputs.tokenRotation.value = "450";
+  form.dispatchEvent(new Event("input"));
+  assert.equal(image.style.transform, "rotate(90deg)");
+  preview.onKeyDown({ key: "}", code: "BracketRight", shiftKey: true, preventDefault() {}, stopPropagation() {} });
+  assert.equal(inputs.tokenRotation.value, "105");
+  reset.dispatchEvent(new Event("click"));
+  assert.equal(inputs.tokenRotation.value, "0");
+  assert.equal(image.style.transform, "rotate(0deg)");
+});
+
+test("moving and scaling a rotated image follow the visible axes and preserve rotation", (t) => {
+  const { preview, image, handle, inputs, pointer } = mockTokenPreview();
+  t.after(() => preview.destroy());
+  preview.writeValues({ rotation: 90 });
+  const height = preview.layout.height;
+  preview.startDrag(pointer(image, 100, 100));
+  preview.moveDrag(pointer(image, 100 + height * 0.2, 100));
+  preview.finishDrag();
+  assert.equal(inputs.tokenAnchorX.value, "0.5");
+  assert.equal(inputs.tokenAnchorY.value, "0.7");
+  assert.equal(inputs.tokenRotation.value, "90");
+  preview.startDrag(pointer(handle, 100, 100));
+  preview.moveDrag(pointer(handle, 100 + preview.drag.resizeX * 0.5, 100 + preview.drag.resizeY * 0.5));
+  preview.finishDrag();
+  assert.equal(inputs.tokenScale.value, "1.5");
+  assert.equal(inputs.tokenRotation.value, "90");
+  assert.equal(image.style.transformOrigin, "50% 70%");
+});
+
+test("Save and Close saves anchors, scale, and rotation from visual token preview gestures", async (t) => {
+  const { preview, form, image, handle, rotationHandle, inputs, pointer } = mockTokenPreview();
   t.after(() => preview.destroy());
   const actor = {
     uuid: "Actor.visual-preview", name: "Preview Actor", documentName: "Actor", isOwner: true,
@@ -312,6 +373,9 @@ test("Save and Close saves anchors and scale from visual token preview gestures"
   preview.startDrag(pointer(handle, 0, 0));
   preview.moveDrag(pointer(handle, preview.drag.resizeX * 0.5, preview.drag.resizeY * 0.5));
   preview.finishDrag();
+  preview.startDrag(pointer(rotationHandle, 220, 90));
+  preview.moveDrag(pointer(rotationHandle, 280, 150));
+  preview.finishDrag();
   const editor = new MKTokenPortraitEditor(actor);
   editor.render = async () => editor;
   assert.equal(await editor.onTokenEditorSubmit({ preventDefault() {}, currentTarget: form }), true);
@@ -320,6 +384,7 @@ test("Save and Close saves anchors and scale from visual token preview gestures"
   assert.equal(updates["prototypeToken.texture.anchorY"], 0.75);
   assert.equal(updates["prototypeToken.texture.scaleX"], 1.5);
   assert.equal(updates["prototypeToken.texture.scaleY"], 1.5);
+  assert.equal(updates["prototypeToken.rotation"], 90);
   assert.equal(inputs.tokenScaleRange.value, "1.5");
 });
 
@@ -366,6 +431,41 @@ test("preview batches rapid gestures into one paint while keeping form values cu
   assert.equal(frames.size, 1);
   preview.destroy();
   assert.equal(frames.size, 0);
+});
+
+test("repeated preview disposal releases listeners, observers, pointer captures, and queued frames", (t) => {
+  const previous = Object.fromEntries(["ResizeObserver", "requestAnimationFrame", "cancelAnimationFrame"]
+    .map((key) => [key, globalThis[key]]));
+  const observers = [];
+  const frames = new Map();
+  let nextFrame = 0;
+  globalThis.ResizeObserver = class {
+    constructor() { observers.push(this); }
+    observe(stage) { this.stage = stage; }
+    disconnect() { this.stage = null; this.disconnected = true; }
+  };
+  globalThis.requestAnimationFrame = (callback) => { frames.set(++nextFrame, callback); return nextFrame; };
+  globalThis.cancelAnimationFrame = (id) => frames.delete(id);
+  t.after(() => Object.assign(globalThis, previous));
+  for (let cycle = 0; cycle < 50; cycle++) {
+    const { preview, form, stage, image, reset, pointer, captured } = mockTokenPreview();
+    preview.startDrag(pointer(image, 100, 100));
+    preview.moveDrag(pointer(image, 110, 110));
+    assert.equal(frames.size, 1);
+    preview.destroy();
+    preview.destroy();
+    assert.equal(frames.size, 0);
+    assert.equal(captured.size, 0);
+    for (const type of ["pointerdown", "pointermove", "pointerup", "pointercancel", "lostpointercapture", "wheel", "keydown"]) {
+      assert.equal(getEventListeners(stage, type).length, 0);
+    }
+    assert.equal(getEventListeners(form, "input").length, 0);
+    assert.equal(getEventListeners(form, "change").length, 0);
+    assert.equal(getEventListeners(image, "load").length, 0);
+    assert.equal(getEventListeners(reset, "click").length, 0);
+  }
+  assert.equal(observers.length, 50);
+  assert.ok(observers.every((observer) => observer.disconnected && observer.stage === null));
 });
 
 test("world Actor loading reuses folder paths and refreshes them on the next load", (t) => {
@@ -609,7 +709,191 @@ test("Save and Close saves both names and appearance before closing the editor",
   else globalThis.fromUuid = priorFromUuid;
 });
 
-test("Save and Close keeps the editor open when the Actor update fails", async (t) => {
+test("rotation saves use the prototype token and preserve locked artwork until its angle changes", async (t) => {
+  const { form, inputs, preview } = mockTokenPreview();
+  t.after(() => preview.destroy());
+  const actor = {
+    uuid: "Actor.rotation", name: "Rotated Actor", documentName: "Actor", isOwner: true,
+    prototypeToken: { rotation: 90, lockRotation: true, texture: {} },
+    update: t.mock.fn(async () => {})
+  };
+  const priorFromUuid = globalThis.fromUuid;
+  globalThis.fromUuid = async () => actor;
+  t.after(() => { globalThis.fromUuid = priorFromUuid; });
+  const editor = new MKTokenPortraitEditor(actor);
+  assert.equal(editor.buildTokenEditorData(actor).rotation, 0);
+  const submit = () => editor.onTokenEditorSubmit({ preventDefault() {}, currentTarget: form });
+  await submit();
+  const [unchanged] = actor.update.mock.calls[0].arguments;
+  assert.equal(Object.hasOwn(unchanged, "prototypeToken.rotation"), false);
+  assert.equal(Object.hasOwn(unchanged, "prototypeToken.lockRotation"), false);
+
+  inputs.tokenRotation.value = "45";
+  await submit();
+  const [rotated] = actor.update.mock.calls[1].arguments;
+  assert.equal(rotated["prototypeToken.rotation"], 45);
+  assert.equal(rotated["prototypeToken.lockRotation"], false);
+  actor.prototypeToken.lockRotation = false;
+  assert.equal(editor.buildTokenEditorData(actor).rotation, 90);
+});
+
+function mockEditorImage(path = "missing.webp") {
+  const attributes = new Map();
+  const input = Object.assign(new EventTarget(), {
+    value: path,
+    setAttribute: (name, value) => attributes.set(name, value),
+    removeAttribute: (name) => attributes.delete(name)
+  });
+  let src = path;
+  let sourceChanges = 0;
+  const image = Object.assign(new EventTarget(), {
+    complete: false, naturalWidth: 0,
+    getAttribute: (name) => name === "src" ? src : null
+  });
+  Object.defineProperty(image, "src", {
+    get: () => src,
+    set: (value) => { src = value; sourceChanges++; }
+  });
+  const warning = { hidden: true };
+  const form = new EventTarget();
+  form.querySelector = (selector) => ({
+    "[data-action='token-editor-form']": form,
+    "[name='portraitImg']": input,
+    "[data-role='token-editor-preview']": image,
+    "[data-role='token-image-warning']": warning
+  })[selector];
+  return { form, input, image, warning, attributes, sourceChanges: () => sourceChanges };
+}
+
+test("Actor Editor warns on failed images without replacing the entered path, including placeholder failures", () => {
+  const editor = new MKTokenPortraitEditor({ uuid: "Actor.test" });
+  const { form, input, image, warning, attributes, sourceChanges } = mockEditorImage("  missing.webp  ");
+  editor.activateListeners(form);
+  image.dispatchEvent(new Event("error"));
+  assert.equal(warning.hidden, false);
+  assert.equal(attributes.get("aria-invalid"), "true");
+  assert.equal(input.value, "  missing.webp  ");
+  assert.equal(image.src, "icons/svg/mystery-man.svg");
+  assert.equal(sourceChanges(), 1);
+  image.dispatchEvent(new Event("load"));
+  assert.equal(warning.hidden, false);
+  image.dispatchEvent(new Event("error"));
+  assert.equal(sourceChanges(), 1);
+  assert.equal(warning.hidden, false);
+  input.value = "  fixed.webp  ";
+  input.dispatchEvent(new Event("input"));
+  assert.equal(input.value, "  fixed.webp  ");
+  assert.equal(image.src, "fixed.webp");
+  assert.equal(warning.hidden, true);
+  assert.equal(attributes.has("aria-invalid"), false);
+  image.dispatchEvent(new Event("load"));
+  assert.equal(warning.hidden, true);
+});
+
+test("Actor Editor detects an initial image failure that completed before listeners attached", () => {
+  const editor = new MKTokenPortraitEditor({ uuid: "Actor.test" });
+  const { form, image, warning, input } = mockEditorImage();
+  image.complete = true;
+  editor.activateListeners(form);
+  assert.equal(warning.hidden, false);
+  assert.equal(input.value, "missing.webp");
+  assert.equal(image.src, "icons/svg/mystery-man.svg");
+  input.value = "";
+  input.dispatchEvent(new Event("input"));
+  image.dispatchEvent(new Event("error"));
+  assert.equal(input.value, "");
+  assert.equal(warning.hidden, true);
+});
+
+test("choosing an image clears the old warning and reports failures for the chosen path", async (t) => {
+  const priorPicker = globalThis.FilePicker;
+  const priorApps = foundry.applications.apps;
+  t.after(() => {
+    if (priorPicker === undefined) delete globalThis.FilePicker;
+    else globalThis.FilePicker = priorPicker;
+    foundry.applications.apps = priorApps;
+  });
+  let pickerOptions;
+  foundry.applications.apps = {};
+  globalThis.FilePicker = class {
+    constructor(options) { pickerOptions = options; }
+    async browse() { pickerOptions.callback("chosen.webp"); }
+  };
+  const editor = new MKTokenPortraitEditor({ uuid: "Actor.test" });
+  const { form, image, input, warning } = mockEditorImage();
+  editor.activateListeners(form);
+  image.dispatchEvent(new Event("error"));
+  await editor.onBrowseTokenImage({ preventDefault() {}, stopPropagation() {}, currentTarget: { closest: () => form } });
+  assert.equal(pickerOptions.current, "missing.webp");
+  assert.equal(input.value, "chosen.webp");
+  assert.equal(image.src, "chosen.webp");
+  assert.equal(warning.hidden, true);
+  image.dispatchEvent(new Event("error"));
+  assert.equal(warning.hidden, false);
+  assert.equal(input.value, "chosen.webp");
+});
+
+test("Actor Editor blocks repeated saves from Actor lookup until the successful close finishes", async (t) => {
+  const { form, preview } = mockTokenPreview();
+  const priorFromUuid = globalThis.fromUuid;
+  t.after(() => {
+    globalThis.fromUuid = priorFromUuid;
+    preview.destroy();
+  });
+  const lookup = deferred();
+  const updateStarted = deferred();
+  const updateCompleted = deferred();
+  const closeStarted = deferred();
+  const closeCompleted = deferred();
+  const actor = {
+    uuid: "Actor.single-save", name: "Test Actor", documentName: "Actor", isOwner: true,
+    prototypeToken: { width: 1, height: 1, texture: {} },
+    update: t.mock.fn(async () => {
+      updateStarted.resolve();
+      await updateCompleted.promise;
+    })
+  };
+  globalThis.fromUuid = t.mock.fn(() => lookup.promise);
+  const button = { disabled: false };
+  const attributes = new Map();
+  const querySelector = form.querySelector;
+  form.querySelector = (selector) => selector === "[type='submit']" ? button : querySelector(selector);
+  form.setAttribute = (name, value) => attributes.set(name, value);
+  form.removeAttribute = (name) => attributes.delete(name);
+  const editor = new MKTokenPortraitEditor(actor);
+  editor.rendered = true;
+  const close = t.mock.method(editor, "close", async () => {
+    closeStarted.resolve();
+    await closeCompleted.promise;
+    editor.rendered = false;
+  });
+  const submit = () => editor.onTokenEditorSubmit({ preventDefault() {}, currentTarget: form });
+  const saving = submit();
+  assert.equal(editor.saving, true);
+  assert.equal(button.disabled, true);
+  assert.equal(attributes.get("aria-busy"), "true");
+  assert.equal(await submit(), false);
+  assert.equal(globalThis.fromUuid.mock.callCount(), 1);
+
+  lookup.resolve(actor);
+  await updateStarted.promise;
+  assert.equal(await submit(), false);
+  assert.equal(actor.update.mock.callCount(), 1);
+  updateCompleted.resolve();
+  await closeStarted.promise;
+  assert.equal(editor.saving, true);
+  assert.equal(button.disabled, true);
+  assert.equal(await submit(), false);
+  assert.equal(close.mock.callCount(), 1);
+  closeCompleted.resolve();
+  assert.equal(await saving, true);
+  assert.equal(editor.rendered, false);
+  assert.equal(editor.saving, false);
+  assert.equal(button.disabled, false);
+  assert.equal(attributes.has("aria-busy"), false);
+});
+
+test("Save and Close keeps the editor open when the Actor update fails and allows retry", async (t) => {
   const priorFromUuid = globalThis.fromUuid;
   t.after(() => { globalThis.fromUuid = priorFromUuid; });
   const actor = {
@@ -624,9 +908,14 @@ test("Save and Close keeps the editor open when the Actor update fails", async (
   const onClose = t.mock.fn();
   const app = new MKTokenPortraitEditor(actor, { onApply, onClose });
   app.rendered = true;
+  const button = { disabled: false };
+  const attributes = new Map();
   const form = {
     reportValidity: () => true,
-    querySelector: (selector) => ({ value: selector === "[name='portraitImg']" ? "portrait.webp" : undefined })
+    querySelector: (selector) => selector === "[type='submit']" ? button
+      : { value: selector === "[name='portraitImg']" ? "portrait.webp" : undefined },
+    setAttribute: (name, value) => attributes.set(name, value),
+    removeAttribute: (name) => attributes.delete(name)
   };
 
   assert.equal(await app.onTokenEditorSubmit({ preventDefault() {}, currentTarget: form }), false);
@@ -634,6 +923,17 @@ test("Save and Close keeps the editor open when the Actor update fails", async (
   assert.equal(onApply.mock.callCount(), 0);
   assert.equal(onClose.mock.callCount(), 0);
   assert.equal(errorNotification.mock.callCount(), 1);
+  assert.equal(app.saving, false);
+  assert.equal(button.disabled, false);
+  assert.equal(attributes.has("aria-busy"), false);
+  assert.equal(form.querySelector("[name='portraitImg']").value, "portrait.webp");
+
+  actor.update = t.mock.fn(async () => {});
+  assert.equal(await app.onTokenEditorSubmit({ preventDefault() {}, currentTarget: form }), true);
+  assert.equal(actor.update.mock.callCount(), 1);
+  assert.equal(onApply.mock.callCount(), 1);
+  assert.equal(onClose.mock.callCount(), 1);
+  assert.equal(app.rendered, false);
 });
 
 test("Actor Editor rejects whitespace-only names without saving or closing", async (t) => {
@@ -776,6 +1076,202 @@ test("a failed Favorites save preserves the prior selection and allows retry", a
   await app.onToggleFavorite(event);
   assert.deepEqual(preferences.favoriteActors, ["Actor.kept", "Actor.new"]);
   assert.equal(render.mock.callCount(), 1);
+});
+
+test("the compendium toolbar toggle persists per client, reloads sources, and clears a hidden pack selection", async (t) => {
+  let indexRequests = 0;
+  const preferences = { browseCompendiumActors: true };
+  mockActorSources(t, async () => {
+    indexRequests++;
+    return [{ _id: "one", name: "Goblin", type: "npc", img: "goblin.webp" }];
+  }, preferences);
+  game.settings.set = t.mock.fn(async (_module, key, value) => { preferences[key] = value; });
+  const app = new MKActorsApp();
+  const first = await app.getData();
+  assert.equal(first.includeCompendiumActors, true);
+  assert.equal(first.canToggleCompendiums, true);
+  app.filters.source = "compendium:test.actors";
+  app.filters.search = "Goblin";
+  const button = {};
+  await app.toggleCompendiums(button);
+  const excluded = await app.getData();
+  assert.equal(excluded.includeCompendiumActors, false);
+  assert.equal(excluded.sourceLocation, "MKACTORS.WorldActors");
+  assert.equal(excluded.resultCount, 0);
+  assert.equal(excluded.sourceTree.some((source) => source.value.startsWith("compendium:")), false);
+  assert.equal(app.filters.source, "");
+  assert.equal(app.filters.search, "Goblin");
+  assert.equal(indexRequests, 1);
+  assert.equal(button.disabled, false);
+  assert.equal(new MKActorsApp().includesCompendiums(), false);
+  assert.deepEqual(game.settings.set.mock.calls[0].arguments, ["mk-actors", "browseCompendiumActors", false]);
+
+  await app.toggleCompendiums(button);
+  assert.equal((await app.getData()).resultCount, 1);
+  assert.equal(indexRequests, 2);
+  assert.equal(new MKActorsApp().includesCompendiums(), true);
+});
+
+test("compendium toggles handle failed saves and cannot override the world's disabled setting", async (t) => {
+  const preferences = { includeCompendiumActors: true, browseCompendiumActors: true };
+  mockActorSources(t, async () => [], preferences);
+  game.settings.set = t.mock.fn(async () => { throw new Error("Storage unavailable"); });
+  t.mock.method(console, "error", () => {});
+  const warning = t.mock.method(ui.notifications, "error");
+  const app = new MKActorsApp();
+  app.filters.source = "compendium:test.actors";
+  const button = {};
+  await app.toggleCompendiums(button);
+  assert.equal(app.includesCompendiums(), true);
+  assert.equal(app.filters.source, "compendium:test.actors");
+  assert.equal(app.savingCompendiumPreference, false);
+  assert.equal(button.disabled, false);
+  assert.equal(warning.mock.calls[0].arguments[0], "MKACTORS.CompendiumToggleFailed");
+  preferences.includeCompendiumActors = false;
+  const data = await app.getData();
+  assert.equal(data.includeCompendiumActors, false);
+  assert.equal(data.canToggleCompendiums, false);
+  await app.toggleCompendiums(button);
+  await app.browsingPreferencesSave;
+  assert.equal(game.settings.set.mock.calls.filter((call) => call.arguments[1] === "browseCompendiumActors").length, 1);
+  assert.equal(app.filters.source, "");
+});
+
+test("gallery restores browsing preferences and corrects unavailable types and sources before filtering", async (t) => {
+  let indexRequests = 0;
+  const preferences = { browsingPreferences: {
+    search: "goblin", type: "removed-type", source: "compendium:removed.pack", sourcesCollapsed: true
+  } };
+  mockActorSources(t, async () => {
+    indexRequests++;
+    return [{ _id: "goblin", name: "Goblin", type: "npc" }];
+  }, preferences);
+  game.settings.set = async (_module, key, value) => { preferences[key] = value; };
+  const app = new MKActorsApp();
+  assert.deepEqual(app.filters, { search: "goblin", type: "removed-type", source: "compendium:removed.pack" });
+  assert.equal(app.sourcesCollapsed, true);
+  const data = await app.getData();
+  await app.browsingPreferencesSave;
+  assert.equal(data.resultCount, 1);
+  assert.equal(data.types.find((option) => option.selected).value, "");
+  assert.equal(data.activeSource.value, "");
+  assert.deepEqual(preferences.browsingPreferences,
+    { search: "goblin", type: "", source: "", sourcesCollapsed: true });
+  const reopened = new MKActorsApp();
+  assert.deepEqual(reopened.filters, app.filters);
+  assert.equal(reopened.sourcesCollapsed, true);
+  app.filters = { search: "missing name", type: "npc", source: "compendium:test.actors" };
+  assert.equal((await app.getData()).resultCount, 0);
+  assert.equal(app.filters.source, "compendium:test.actors");
+  assert.equal(app.filters.type, "npc");
+  assert.equal(indexRequests, 1);
+});
+
+test("gallery tolerates malformed saved preferences and keeps an empty Favorites selection", async (t) => {
+  const preferences = {};
+  mockActorSources(t, async () => [], preferences);
+  for (const saved of [undefined, null, false, "bad data", [],
+    { search: 7, type: {}, source: [], sourcesCollapsed: "true" }]) {
+    preferences.browsingPreferences = saved;
+    const app = new MKActorsApp();
+    assert.deepEqual(app.filters, { search: "", type: "", source: "" });
+    assert.equal(app.sourcesCollapsed, false);
+  }
+  preferences.browsingPreferences = { source: "favorites", sourcesCollapsed: true };
+  const app = new MKActorsApp();
+  const data = await app.getData();
+  assert.equal(data.activeSource.value, "favorites");
+  assert.equal(data.resultCount, 0);
+  assert.equal(data.sourcesCollapsed, true);
+});
+
+test("browsing controls save their state and closing flushes search before its delayed render", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const preferences = {};
+  mockActorSources(t, async () => [], preferences);
+  game.settings.set = async (_module, key, value) => { preferences[key] = value; };
+  const controls = Object.fromEntries(["search", "type", "source-tree", "toggle-sources", "clear"]
+    .map((action) => [action, Object.assign(new EventTarget(), {
+      value: "", dataset: { source: "favorites" }, setAttribute() {}, querySelector: () => null
+    })]));
+  const root = {
+    querySelector: (selector) => Object.entries(controls)
+      .find(([action]) => selector === `[data-action='${action}']`)?.[1],
+    querySelectorAll: (selector) => selector === "[data-action='source-tree']" ? [controls["source-tree"]] : []
+  };
+  const app = new MKActorsApp();
+  const render = t.mock.method(app, "render", async () => app);
+  app.activateListeners(root);
+  controls.type.value = "npc";
+  controls.type.dispatchEvent(new Event("change"));
+  await app.browsingPreferencesSave;
+  assert.equal(preferences.browsingPreferences.type, "npc");
+  controls["source-tree"].dispatchEvent(new Event("click"));
+  await app.browsingPreferencesSave;
+  assert.equal(preferences.browsingPreferences.source, "favorites");
+  controls["toggle-sources"].dispatchEvent(new Event("click"));
+  await app.browsingPreferencesSave;
+  assert.equal(preferences.browsingPreferences.sourcesCollapsed, true);
+  controls.search.value = "latest search";
+  controls.search.dispatchEvent(new Event("input"));
+  const rendersBeforeClose = render.mock.callCount();
+  await app.close();
+  t.mock.timers.tick(500);
+  assert.equal(render.mock.callCount(), rendersBeforeClose);
+  const reopened = new MKActorsApp();
+  assert.deepEqual(reopened.filters, { search: "latest search", type: "npc", source: "favorites" });
+  assert.equal(reopened.sourcesCollapsed, true);
+  controls.clear.dispatchEvent(new Event("click"));
+  await app.browsingPreferencesSave;
+  const cleared = new MKActorsApp();
+  assert.deepEqual(cleared.filters, { search: "", type: "", source: "" });
+  assert.equal(cleared.sourcesCollapsed, true);
+});
+
+test("preference writes serialize and skip obsolete queued search values", async (t) => {
+  mockActorSources(t, async () => []);
+  const firstWrite = deferred();
+  const saved = [];
+  game.settings.set = t.mock.fn(async (_module, key, value) => {
+    assert.equal(key, "browsingPreferences");
+    if (!saved.length) {
+      saved.push(value);
+      await firstWrite.promise;
+    } else saved.push(value);
+  });
+  const app = new MKActorsApp();
+  app.filters.search = "first";
+  const first = app.saveBrowsingPreferences();
+  await Promise.resolve();
+  app.filters.search = "obsolete";
+  void app.saveBrowsingPreferences();
+  app.filters.search = "latest";
+  app.sourcesCollapsed = true;
+  const latest = app.saveBrowsingPreferences();
+  assert.equal(game.settings.set.mock.callCount(), 1);
+  firstWrite.resolve();
+  await first;
+  await latest;
+  assert.deepEqual(saved.map((entry) => entry.search), ["first", "latest"]);
+  assert.equal(saved[0].sourcesCollapsed, false);
+  assert.equal(saved[1].sourcesCollapsed, true);
+});
+
+test("failed preference saves keep the current filters and warn once until storage recovers", async (t) => {
+  mockActorSources(t, async () => []);
+  t.mock.method(console, "error", () => {});
+  const warning = t.mock.method(ui.notifications, "warn");
+  game.settings.set = async () => { throw new Error("Storage unavailable"); };
+  const app = new MKActorsApp();
+  app.filters = { search: "draft", type: "npc", source: "favorites" };
+  await app.saveBrowsingPreferences();
+  await app.saveBrowsingPreferences();
+  assert.deepEqual(app.filters, { search: "draft", type: "npc", source: "favorites" });
+  assert.equal(warning.mock.callCount(), 1);
+  assert.equal(warning.mock.calls[0].arguments[0], "MKACTORS.BrowsingPreferencesSaveFailed");
+  game.settings.set = async () => {};
+  await app.saveBrowsingPreferences();
+  assert.equal(app.browsingPreferencesWarningShown, false);
 });
 
 test("gallery starts with all accessible types and restores them when cleared", async (t) => {
@@ -922,6 +1418,88 @@ test("non-GM users cannot index hidden compendiums", async () => {
 
   game.settings = priorSettings;
   game.packs = priorPacks;
+});
+
+test("closing the gallery cancels pending search work and reopening can schedule a fresh search", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const app = new MKActorsApp();
+  app.rendered = true;
+  const search = Object.assign(new EventTarget(), { value: "queued search" });
+  app.activateListeners({ querySelector: (selector) => selector === "[data-action='search']" ? search : null });
+  const render = t.mock.method(app, "render");
+  search.dispatchEvent(new Event("input"));
+  await app.close();
+  t.mock.timers.tick(500);
+  assert.equal(render.mock.callCount(), 0);
+  assert.equal(app.searchRenderTimer, null);
+  assert.equal(app.restoreSearchFocus, false);
+  app.rendered = true;
+  search.dispatchEvent(new Event("input"));
+  t.mock.timers.tick(150);
+  assert.equal(render.mock.callCount(), 1);
+  assert.equal(app.searchRenderTimer, null);
+});
+
+test("large world and compendium collections merge without JavaScript argument-limit failures", async (t) => {
+  mockActorSources(t, async () => []);
+  const entries = Array.from({ length: 200000 }, (_, index) => ({ name: `Actor ${index}` }));
+  const app = new MKActorsApp();
+  t.mock.method(app, "getCompendiumActorEntries", async () => entries);
+  assert.equal((await app.getActorEntries()).length, entries.length);
+  app.invalidateCache();
+  game.settings.get = (_module, key) => key === "includeWorldActors";
+  t.mock.method(app, "getWorldActorEntries", () => entries);
+  assert.equal((await app.getActorEntries()).length, entries.length);
+});
+
+test("compendium indexing limits simultaneous requests without dropping or reordering packs", async (t) => {
+  mockActorSources(t, async () => []);
+  const pending = Array.from({ length: 11 }, () => deferred());
+  let active = 0;
+  let peak = 0;
+  game.packs = pending.map((index, pack) => ({
+    documentName: "Actor", visible: true, collection: `test.pack${pack}`,
+    getIndex: () => {
+      active++;
+      peak = Math.max(peak, active);
+      return index.promise.finally(() => { active--; });
+    }
+  }));
+  t.after(() => pending.forEach((index) => index.resolve([])));
+  const app = new MKActorsApp();
+  const loading = app.getCompendiumActorEntries();
+  assert.ok(peak <= 4, `Expected at most four index requests, saw ${peak}`);
+  for (let pack = 0; pack < pending.length; pack++) {
+    pending[pack].resolve([{ _id: String(pack), name: `Actor ${pack}`, type: "npc" }]);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  const entries = await loading;
+  assert.equal(entries.length, 11);
+  assert.equal(active, 0);
+  assert.ok(peak <= 4);
+  assert.deepEqual(entries.map((entry) => entry.sourceId), game.packs.map((pack) => pack.collection));
+});
+
+test("invalidated indexing stops queued pack requests and skips processing obsolete indexes", async (t) => {
+  mockActorSources(t, async () => []);
+  const old = Array.from({ length: 4 }, () => deferred());
+  const requests = Array(7).fill(0);
+  game.packs = requests.map((_count, pack) => ({
+    documentName: "Actor", visible: true, collection: `test.pack${pack}`,
+    getIndex: () => {
+      requests[pack]++;
+      return pack < 4 && requests[pack] === 1 ? old[pack].promise : [];
+    }
+  }));
+  t.after(() => old.forEach((index) => index.resolve([])));
+  const app = new MKActorsApp();
+  const oldLoad = app.getActorEntries();
+  app.invalidateCache();
+  const refreshed = await app.getActorEntries();
+  const unusedIndex = { [Symbol.iterator]: () => assert.fail("A stale index must not be processed") };
+  old.forEach((index) => index.resolve(unusedIndex));
+  assert.strictEqual(await oldLoad, refreshed);
+  assert.deepEqual(requests, [2, 2, 2, 2, 1, 1, 1]);
 });
 
 test("concurrent gallery loads share one compendium index request", async (t) => {
@@ -1129,14 +1707,21 @@ test("popup editing checks update permission again and closes if the Actor disap
   actor.isOwner = true;
   const editor = await gallery.openTokenPortraitEditor(actor.uuid);
   actor.isOwner = false;
-  const event = { preventDefault: () => {}, currentTarget: { reportValidity: () => true } };
+  const button = { disabled: false };
+  const event = { preventDefault: () => {}, currentTarget: {
+    reportValidity: () => true, querySelector: () => button
+  } };
   assert.equal(await editor.onTokenEditorSubmit(event), false);
   assert.equal(warning, "MKACTORS.CannotModifyActor");
   assert.equal(editor.rendered, true);
+  assert.equal(editor.saving, false);
+  assert.equal(button.disabled, false);
   actor = null;
   assert.equal(await editor.onTokenEditorSubmit(event), false);
   assert.equal(warning, "MKACTORS.CannotResolveActor");
   assert.equal(editor.rendered, false);
+  assert.equal(editor.saving, false);
+  assert.equal(button.disabled, false);
   assert.equal(gallery.tokenEditors.size, 0);
 });
 

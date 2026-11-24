@@ -113,6 +113,19 @@ test("opening the existing shadow window preserves unsaved controls", async (t) 
   assert.equal(app.context.fields.find((field) => field.key === "tokenShadowAlpha").value, 0.8);
 });
 
+test("replacing the shadow settings content releases the previous preview before detaching its canvas", async (t) => {
+  setup(t);
+  const { MKTokenShadowSettings } = await import("../scripts/token-shadow-settings.js");
+  const app = new MKTokenShadowSettings();
+  const content = {};
+  const destroy = t.mock.fn(() => { assert.equal(content.innerHTML, undefined); });
+  app.shadowPreview = { destroy };
+  app._replaceHTML("replacement", content);
+  assert.equal(destroy.mock.callCount(), 1);
+  assert.equal(app.shadowPreview, null);
+  assert.equal(content.innerHTML, "replacement");
+});
+
 test("repeated submits cannot overlap shadow saves or overwrite the first draft", async (t) => {
   const { values } = setup(t);
   const app = await openTokenShadowSettings();

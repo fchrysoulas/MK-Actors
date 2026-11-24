@@ -3,13 +3,13 @@ import { canModifyActor } from "./actor-helpers.js";
 import { resolveActor } from "./documents.js";
 import { resolveFilePickerClass } from "./file-picker.js";
 import { TokenImagePreview } from "./token-preview.js";
-import { localize, normalizeNumber } from "./utils.js";
+import { localize, normalizeAngle, normalizeNumber } from "./utils.js";
 import { prepareWindowDrag } from "./window-drag.js";
 
 export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
     classes: ["mk-actors-token-editor-app"],
-    position: { width: 420, height: 740 },
+    position: { width: 800, height: 740 },
     window: { title: "MKACTORS.TokenPortraitEditorTitle", resizable: true }
   };
 
@@ -19,6 +19,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
     this.onApply = onApply;
     this.onClose = onClose;
     this.preview = null;
+    this.saving = false;
   }
 
   get title() {
@@ -81,6 +82,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
       anchorX: prototypeToken?.texture?.anchorX ?? 0.5,
       anchorY: prototypeToken?.texture?.anchorY ?? 0.5,
       scale: prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
+      rotation: prototypeToken?.lockRotation ? 0 : normalizeAngle(prototypeToken?.rotation),
       labels: {
         title: localize("TokenPortraitEditorTitle"),
         name: localize("Name"),
@@ -89,9 +91,11 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
         previewHint: localize("TokenPreviewHint"),
         previewControls: localize("TokenPreviewControls"),
         scalePreview: localize("ScaleTokenPreview"),
+        rotatePreview: localize("RotateTokenPreview"),
         resetPreview: localize("ResetTokenPreview"),
         cancel: localize("Cancel"),
         imagePath: localize("ImagePath"),
+        imageLoadFailed: localize("ImageLoadFailed"),
         browseImage: localize("BrowseImage"),
         imagePathPortraitNote: localize("ImagePathPortraitNote"),
         dimensionsGridSpaces: localize("DimensionsGridSpaces"),
@@ -105,6 +109,9 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
         y: localize("Y"),
         anchorHint: localize("AnchorHint"),
         scaleRatio: localize("ScaleRatio"),
+        scaleHint: localize("ScaleRatioHint"),
+        rotation: localize("RotationDegrees"),
+        rotationHint: localize("TokenRotationHint"),
         saveAndClose: localize("SaveAndClose")
       }
     };
@@ -134,17 +141,35 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
     scaleInput?.addEventListener("input", () => {
       if (scaleRange) scaleRange.value = scaleInput.value;
     });
-    portraitInput?.addEventListener("input", () => {
-      if (portraitPreview) portraitPreview.src = portraitInput.value.trim() || DEFAULT_ACTOR_IMAGE;
+    portraitInput?.addEventListener("input", () => this.updatePortraitPreview(root));
+    const onImageError = () => {
+      this.setImageLoadFailure(root, Boolean(portraitInput?.value.trim()));
+      if (portraitPreview.getAttribute("src") !== DEFAULT_ACTOR_IMAGE) portraitPreview.src = DEFAULT_ACTOR_IMAGE;
+    };
+    portraitPreview?.addEventListener("error", onImageError);
+    portraitPreview?.addEventListener("load", () => {
+      // A successful placeholder load must not hide a failed user-entered path.
+      if (portraitPreview.getAttribute("src") === portraitInput?.value.trim()) this.setImageLoadFailure(root, false);
     });
-    portraitPreview?.addEventListener("error", (event) => {
-      if (event.currentTarget.getAttribute("src") !== DEFAULT_ACTOR_IMAGE) {
-        event.currentTarget.src = DEFAULT_ACTOR_IMAGE;
-      }
-    });
+    if (portraitPreview?.complete && portraitPreview.naturalWidth === 0) onImageError();
     this.preview?.destroy();
     const form = root.querySelector?.("[data-action='token-editor-form']");
     this.preview = form?.querySelector?.("[data-role='token-preview-stage']") ? new TokenImagePreview(form) : null;
+  }
+
+  setImageLoadFailure(root, failed) {
+    const warning = root?.querySelector?.("[data-role='token-image-warning']");
+    const input = root?.querySelector?.("[name='portraitImg']");
+    if (warning) warning.hidden = !failed;
+    if (failed) input?.setAttribute?.("aria-invalid", "true");
+    else input?.removeAttribute?.("aria-invalid");
+  }
+
+  updatePortraitPreview(root) {
+    const input = root?.querySelector?.("[name='portraitImg']");
+    const image = root?.querySelector?.("[data-role='token-editor-preview']");
+    this.setImageLoadFailure(root, false);
+    if (image) image.src = input?.value.trim() || DEFAULT_ACTOR_IMAGE;
   }
 
   async onBrowseTokenImage(event) {
@@ -153,7 +178,6 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
 
     const form = event.currentTarget.closest?.("form");
     const portraitInput = form?.querySelector("[name='portraitImg']");
-    const portraitPreview = form?.querySelector("[data-role='token-editor-preview']");
     const FilePickerClass = resolveFilePickerClass();
 
     if (!FilePickerClass) {
@@ -168,7 +192,7 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
         current: portraitInput?.value || "",
         callback: (path) => {
           if (portraitInput) portraitInput.value = path;
-          if (portraitPreview) portraitPreview.src = path;
+          this.updatePortraitPreview(form);
         }
       });
       await picker.browse();
@@ -182,71 +206,83 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
 
   async onTokenEditorSubmit(event) {
     event.preventDefault();
+    if (this.saving) return false;
     const form = event.currentTarget;
     if (!form?.reportValidity()) return false;
 
-    const actor = await resolveActor(this.actor.uuid);
-    if (!actor) {
-      ui.notifications.warn(localize("CannotResolveActor"));
-      await this.close();
-      return false;
-    }
-    if (!canModifyActor(actor)) {
-      ui.notifications.warn(localize("CannotModifyActor"));
-      return false;
-    }
-
-    const prototypeToken = actor.prototypeToken;
-    const currentFit = prototypeToken?.texture?.fit || "height";
-    const actorName = String(form.querySelector("[name='actorName']")?.value ?? actor.name ?? "").trim();
-    const portraitImg = String(form.querySelector("[name='portraitImg']")?.value ?? "").trim();
-    const requestedFit = String(form.querySelector("[name='tokenFit']")?.value ?? currentFit);
-    const allowedFits = new Set(["contain", "cover", "fill", "height", "width"]);
-
-    if (!actorName) {
-      ui.notifications.warn(localize("ActorNameRequired"));
-      return false;
-    }
-
-    if (!portraitImg) {
-      ui.notifications.warn(localize("ImagePathRequired"));
-      return false;
-    }
-
-    const updates = {
-      name: actorName,
-      "prototypeToken.name": actorName,
-      img: portraitImg,
-      "prototypeToken.width": normalizeNumber(
-        form.querySelector("[name='tokenWidth']")?.value,
-        prototypeToken?.width ?? 1,
-        { min: 0.5, step: 0.5 }
-      ),
-      "prototypeToken.height": normalizeNumber(
-        form.querySelector("[name='tokenHeight']")?.value,
-        prototypeToken?.height ?? 1,
-        { min: 0.5, step: 0.5 }
-      ),
-      "prototypeToken.texture.fit": allowedFits.has(requestedFit) ? requestedFit : "height",
-      "prototypeToken.texture.anchorX": normalizeNumber(
-        form.querySelector("[name='tokenAnchorX']")?.value,
-        prototypeToken?.texture?.anchorX ?? 0.5,
-        { min: 0, max: 1 }
-      ),
-      "prototypeToken.texture.anchorY": normalizeNumber(
-        form.querySelector("[name='tokenAnchorY']")?.value,
-        prototypeToken?.texture?.anchorY ?? 0.5,
-        { min: 0, max: 1 }
-      ),
-      "prototypeToken.texture.scaleX": normalizeNumber(
-        form.querySelector("[name='tokenScale']")?.value,
-        prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
-        { min: 0.2, max: 3, step: 0.05 }
-      )
-    };
-    updates["prototypeToken.texture.scaleY"] = updates["prototypeToken.texture.scaleX"];
-
+    this.saving = true;
+    const saveButton = form.querySelector("[type='submit']");
+    const wasDisabled = saveButton?.disabled ?? false;
+    if (saveButton) saveButton.disabled = true;
+    form.setAttribute?.("aria-busy", "true");
     try {
+      const actor = await resolveActor(this.actor.uuid);
+      if (!actor) {
+        ui.notifications.warn(localize("CannotResolveActor"));
+        await this.close();
+        return false;
+      }
+      if (!canModifyActor(actor)) {
+        ui.notifications.warn(localize("CannotModifyActor"));
+        return false;
+      }
+
+      const prototypeToken = actor.prototypeToken;
+      const currentFit = prototypeToken?.texture?.fit || "height";
+      const actorName = String(form.querySelector("[name='actorName']")?.value ?? actor.name ?? "").trim();
+      const portraitImg = String(form.querySelector("[name='portraitImg']")?.value ?? "").trim();
+      const requestedFit = String(form.querySelector("[name='tokenFit']")?.value ?? currentFit);
+      const allowedFits = new Set(["contain", "cover", "fill", "height", "width"]);
+
+      if (!actorName) {
+        ui.notifications.warn(localize("ActorNameRequired"));
+        return false;
+      }
+
+      if (!portraitImg) {
+        ui.notifications.warn(localize("ImagePathRequired"));
+        return false;
+      }
+
+      const updates = {
+        name: actorName,
+        "prototypeToken.name": actorName,
+        img: portraitImg,
+        "prototypeToken.width": normalizeNumber(
+          form.querySelector("[name='tokenWidth']")?.value,
+          prototypeToken?.width ?? 1,
+          { min: 0.5, step: 0.5 }
+        ),
+        "prototypeToken.height": normalizeNumber(
+          form.querySelector("[name='tokenHeight']")?.value,
+          prototypeToken?.height ?? 1,
+          { min: 0.5, step: 0.5 }
+        ),
+        "prototypeToken.texture.fit": allowedFits.has(requestedFit) ? requestedFit : "height",
+        "prototypeToken.texture.anchorX": normalizeNumber(
+          form.querySelector("[name='tokenAnchorX']")?.value,
+          prototypeToken?.texture?.anchorX ?? 0.5,
+          { min: 0, max: 1 }
+        ),
+        "prototypeToken.texture.anchorY": normalizeNumber(
+          form.querySelector("[name='tokenAnchorY']")?.value,
+          prototypeToken?.texture?.anchorY ?? 0.5,
+          { min: 0, max: 1 }
+        ),
+        "prototypeToken.texture.scaleX": normalizeNumber(
+          form.querySelector("[name='tokenScale']")?.value,
+          prototypeToken?.texture?.scaleX ?? prototypeToken?.texture?.scaleY ?? 1,
+          { min: 0.2, max: 3, step: 0.05 }
+        )
+      };
+      updates["prototypeToken.texture.scaleY"] = updates["prototypeToken.texture.scaleX"];
+      const currentRotation = prototypeToken?.lockRotation ? 0 : normalizeAngle(prototypeToken?.rotation);
+      const rotation = normalizeAngle(form.querySelector("[name='tokenRotation']")?.value, currentRotation);
+      if (rotation !== currentRotation) {
+        updates["prototypeToken.rotation"] = rotation;
+        if (prototypeToken?.lockRotation) updates["prototypeToken.lockRotation"] = false;
+      }
+
       await actor.update(updates, { mkActorsForcePortraitToTokenImage: true });
       this.actor = actor;
       await this.onApply?.();
@@ -259,6 +295,10 @@ export class MKTokenPortraitEditor extends foundry.applications.api.ApplicationV
         message: err.message ?? err
       }));
       return false;
+    } finally {
+      this.saving = false;
+      if (saveButton) saveButton.disabled = wasDisabled;
+      form.removeAttribute?.("aria-busy");
     }
   }
 }

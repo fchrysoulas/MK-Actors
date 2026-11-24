@@ -904,7 +904,8 @@
 }
 
 .mk-actors-token-editor__reset,
-.mk-actors-token-editor__scale-handle {
+.mk-actors-token-editor__scale-handle,
+.mk-actors-token-editor__rotation-handle {
   display: grid;
   place-items: center;
   width: 30px;
@@ -921,13 +922,15 @@
   cursor: pointer;
 }
 
-.mk-actors-token-editor__scale-handle {
+.mk-actors-token-editor__scale-handle,
+.mk-actors-token-editor__rotation-handle {
   position: absolute;
   transform: translate(-50%, -50%);
   touch-action: none;
 }
 
 .mk-actors-token-editor__scale-handle i,
+.mk-actors-token-editor__rotation-handle i,
 .mk-actors-token-editor__reset i {
   margin: 0;
   pointer-events: none;
@@ -935,6 +938,7 @@
 
 .mk-actors__inspector-preview:focus-visible,
 .mk-actors-token-editor__scale-handle:focus-visible,
+.mk-actors-token-editor__rotation-handle:focus-visible,
 .mk-actors-token-editor__reset:focus-visible {
   outline: 2px solid var(--mk-actors-primary-bright);
   outline-offset: 2px;
@@ -952,7 +956,8 @@
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.045);
 }
 
-.mk-actors__inspector-section > label {
+.mk-actors__inspector-section > label,
+.mk-actors-token-editor__image-heading > label {
   color: var(--mk-actors-text);
   font-size: 12px;
   font-weight: 600;
@@ -1078,6 +1083,12 @@
   outline-offset: 2px;
 }
 
+.mk-actors-token-editor-app [data-action="token-editor-form"] button[type="submit"]:disabled {
+  opacity: 0.5;
+  cursor: wait;
+  filter: none;
+}
+
 .directory .mk-actors-directory-button {
   margin-left: 4px;
 }
@@ -1093,6 +1104,28 @@
   min-width: 0;
 }
 
+.mk-actors-token-editor__image-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.mk-actors-token-editor__image-warning {
+  display: inline-flex;
+  color: var(--mk-actors-warning);
+  font-size: 12px;
+  cursor: help;
+}
+
+.mk-actors-token-editor__image-warning[hidden] {
+  display: none;
+}
+
+.mk-actors-token-editor__row input[aria-invalid="true"] {
+  border-color: var(--mk-actors-warning);
+}
+
 .mk-actors-token-editor__browse {
   width: 34px;
   min-width: 34px;
@@ -1102,9 +1135,20 @@
   margin: 0;
 }
 
+.mk-actors__toolbar .mk-actors__compendiums-toggle.is-active {
+  border-color: var(--mk-actors-primary-border);
+  background: var(--mk-actors-primary-soft);
+  color: var(--mk-actors-primary-bright);
+}
+
+.mk-actors__toolbar .mk-actors__compendiums-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .mk-actors-token-editor__dimensions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.48rem;
 }
 
@@ -1211,8 +1255,35 @@
   min-width: 280px;
 }
 
-@container (max-width: 320px) {
-  .mk-actors__inspector .mk-actors-token-editor__dimensions {
+.mk-actors-token-editor-app .mk-actors-token-editor__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.mk-actors-token-editor__visual,
+.mk-actors-token-editor__settings {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.mk-actors-token-editor__rotation-handle {
+  border-radius: 50%;
+  cursor: grab;
+}
+
+.mk-actors__inspector-preview.is-dragging .mk-actors-token-editor__rotation-handle {
+  cursor: grabbing;
+}
+
+.mk-actors-token-editor-app .mk-actors__inspector-preview {
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+
+@container (max-width: 620px) {
+  .mk-actors-token-editor-app .mk-actors-token-editor__layout {
     grid-template-columns: minmax(0, 1fr);
   }
 }

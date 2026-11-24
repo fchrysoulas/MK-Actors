@@ -116,6 +116,40 @@ test("a scene refresh reads one settings snapshot for all tokens", (t) => {
   assert.equal(get.mock.callCount(), 7);
 });
 
+test("repeated Scene shadow lifecycles release graphics and filters exactly once", (t) => {
+  const { token } = setup(t);
+  for (let cycle = 0; cycle < 200; cycle++) {
+    refreshTokenShadow(token);
+    assert.equal(token.children.length, 1);
+    const shadow = token.children[0];
+    const filter = shadow.filters[0];
+    clearTokenShadows();
+    clearTokenShadows();
+    assert.equal(token.children.length, 0);
+    assert.equal(shadow.destroyed, true);
+    assert.equal(filter.destroyCount, 1);
+  }
+});
+
+test("one failed Graphics teardown cannot retain tokens or prevent other shadows from being released", (t) => {
+  const { token } = setup(t);
+  const other = { ...token, children: [] };
+  canvas.tokens.placeables = [token, other];
+  refreshTokenShadows();
+  const failedShadow = token.children[0];
+  const otherShadow = other.children[0];
+  const destroy = t.mock.method(failedShadow, "destroy", () => { throw new Error("Graphics already disposed"); });
+  assert.doesNotThrow(() => clearTokenShadows());
+  assert.equal(otherShadow.destroyed, true);
+  assert.equal(token.children.length, 0);
+  assert.equal(other.children.length, 0);
+  assert.equal(destroy.mock.callCount(), 1);
+  clearTokenShadows();
+  assert.equal(destroy.mock.callCount(), 1);
+  refreshTokenShadow(token);
+  assert.notStrictEqual(token.children[0], failedShadow);
+});
+
 test("disabling shadows releases graphics and blur filters exactly once", (t) => {
   const { token, values } = setup(t);
   refreshTokenShadow(token);

@@ -16,14 +16,18 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Browse world Actors.
 - Import a Foundry Actor JSON as a new world Actor and choose its portrait and token image before importing.
 - Browse visible Actor compendiums.
+- Toggle Actor compendiums with the book button in the gallery's top bar. The amber state includes compendiums; turning it off browses world Actors only. This preference is saved per client and respects the module's world setting for including compendiums and each user's access.
 - Search by name, Actor type, source, or compendium ID.
 - Filter by any Actor type found in accessible sources, including player-character types, or select All Types.
 - Filter by source from a left tree view with World folders, unfiled World actors, and Actor compendiums.
 - Star an Actor card to add it to **Favorites**, then select **Favorites** in Sources to browse starred world and compendium Actors together. Click its star again to remove it. Favorites stay saved on this Foundry client after reopening or reloading and work with search, type filtering, and the collapsed Sources rail.
-- Collapse the Sources sidebar to a compact icon rail using its small header toggle to give Actor cards more room. Hover over an icon to see the source name. Source filtering and the selected-source highlight remain available, and the sidebar keeps its state while browsing, refreshing, or reopening the gallery during the current session.
+- Restore search, Actor type, selected source, and Sources sidebar state after reopening or reloading on this Foundry client. If a saved type or source is no longer available, its filter returns to All Types or All Sources.
+- Collapse the Sources sidebar to a compact icon rail using its small header toggle to give Actor cards more room. Hover over an icon to see the source name. Source filtering and the selected-source highlight remain available.
 - The compact Sources header aligns with the search header at MK Scene Gallery's height, fills the sidebar width, and stays in place while the source list scrolls.
-- Render large result sets in batches while loading Actor compendium indexes concurrently.
+- Render large result sets in batches while loading up to four Actor compendium indexes concurrently per gallery load. Refreshing stops queued requests and skips processing obsolete index results.
+- Browse very large Actor libraries without hitting JavaScript argument-count limits while combining sources.
 - Reuse folder paths and type/source options while browsing cached Actors, and batch Actor Editor preview redraws to the display's animation frames.
+- Cancel pending search redraws when the gallery closes. Release shadow preview graphics and renderers when their window closes or rerenders, including failed initialization and cleanup paths; one failed Scene shadow cleanup does not block the others.
 - Keep gallery results cached during HP, resource, effect, and other combat-statistic updates; card, source, and permission changes still refresh the gallery.
 - Keep the current gallery scroll position when loading more Actor cards.
 - Show each Actor as a square 1:1 portrait card with only its name as visible metadata.
@@ -37,8 +41,13 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - Drag from an Actor portrait as part of the card.
 - Double-click an Actor card to open its sheet.
 - Right-click an Actor card to open the **Actor Editor**, a separate, movable, resizable popup for its portrait image, token dimensions, fit mode, anchor, and scale.
+- Keep the Name field above the image preview, with all image and token settings in the right third of the editor. The editor opens wide enough for both columns and stacks them when the window is narrowed.
+- Width and Height stay side by side, as do the X and Y anchor fields. Hover over an Actor Editor setting to read its description; help text stays out of the layout and remains available to screen readers.
+- Show a small amber warning beside Image Path when an Actor Editor image fails to load. Hover over the warning for help. The preview uses a placeholder while keeping your entered path for correction; choosing or entering a new path retries the preview.
 - Edit **Name** in Actor Editor to update the Actor name and prototype token name together when you click **Save and Close**.
+- **Save and Close** is disabled while saving to prevent duplicate updates, including repeated Enter presses. If saving fails, the editor keeps your draft and enables the button so you can retry.
 - Position the image visually in the Actor Editor's token preview: drag it to set the anchors, and drag its corner handle or use the mouse wheel to set the scale ratio. Numeric controls stay in sync. Arrow keys move the image; plus and minus adjust scale. Click **Save and Close** to save the changes and close the editor. If saving fails, the editor stays open so you can retry.
+- Rotate the image using its round arrow handle or the **Rotation (Degrees)** field. Hold Shift while dragging to snap to 15-degree angles. The bracket keys rotate by one degree, or 15 degrees with Shift; Escape cancels an active drag. Reset restores position, scale, and angle. Rotation saves to the prototype token for new Scene drops; changing the angle enables artwork rotation if it was locked.
 - Keep the gallery at its current scroll position when the editor opens, applies changes, or closes. Left-clicking does not open the editor.
 - Open an Actor sheet from the gallery.
 - Client-side card size setting.
@@ -56,7 +65,7 @@ Foundry systems use different Actor type IDs. Examples:
 - `character`
 - `pc`
 
-The gallery opens with **All Types**, showing every accessible Actor type, including player-character types. The type selector lists every type found in enabled world and compendium sources. Select a specific type to show its Actors, or **All Types** to show every type again. Search and source filters still apply, and source settings and permissions are respected.
+The gallery initially opens with **All Types**, showing every accessible Actor type, including player-character types. Later openings restore your last search, type, and source filters. The type selector lists every type found in enabled world and compendium sources. Select a specific type to show its Actors, or **All Types** to show every type again. Search and source filters still apply, and source settings and permissions are respected.
 
 **Clear** restores All Types and clears search and source filters. Actor type filtering is controlled directly by the selector; separate included and excluded type settings are no longer used.
 

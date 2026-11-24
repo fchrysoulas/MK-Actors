@@ -1,4 +1,4 @@
-import { DEFAULT_ACTOR_IMAGE, GALLERY_PAGE_SIZE, MODULE_ID } from "./constants.js";
+import { COMPENDIUM_INDEX_CONCURRENCY, DEFAULT_ACTOR_IMAGE, GALLERY_PAGE_SIZE, MODULE_ID } from "./constants.js";
 import { debugLog } from "./debug.js";
 import { resolveActor } from "./documents.js";
 import {
@@ -36,19 +36,20 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.cacheLoad = null;
     this.browseOptions = null;
     this.warnings = [];
-    this.filters = {
-      search: "",
-      type: "",
-      source: ""
-    };
+    const preferences = this.readBrowsingPreferences();
+    this.filters = { search: preferences.search, type: preferences.type, source: preferences.source };
+    this.browsingPreferencesSave = null;
+    this.browsingPreferencesRevision = 0;
+    this.browsingPreferencesWarningShown = false;
     this.visibleLimit = GALLERY_PAGE_SIZE;
     this.searchRenderTimer = null;
     this.restoreSearchFocus = false;
     this.tokenEditors = new Map();
     this.pendingGridAnchor = null;
-    this.sourcesCollapsed = false;
+    this.sourcesCollapsed = preferences.sourcesCollapsed;
     this.favoriteActors = this.readFavorites();
     this.savingFavorite = false;
+    this.savingCompendiumPreference = false;
     this.actorImportApp = null;
   }
 
@@ -87,6 +88,14 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     super._onClose(options);
   }
 
+  async close(options = {}) {
+    clearTimeout(this.searchRenderTimer);
+    this.searchRenderTimer = null;
+    this.restoreSearchFocus = false;
+    await this.browsingPreferencesSave;
+    return super.close(options);
+  }
+
   invalidateCache() {
     debugLog("Invalidating gallery cache");
     if (!this.pendingGridAnchor) {
@@ -105,15 +114,28 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     debugLog("Preparing gallery data", { state: { ...this.filters } });
     this.favoriteActors = this.readFavorites();
     const allActors = await this.getActorEntries();
+    let { types, sourceTree } = this.getBrowseOptions(allActors);
+    let correctedFilters = false;
+    if (!types.some((option) => option.value === this.filters.type)) {
+      this.filters.type = "";
+      correctedFilters = true;
+    }
+    if (!sourceTree.some((option) => option.value === this.filters.source)) {
+      this.filters.source = "";
+      correctedFilters = true;
+    }
+    if (correctedFilters) {
+      void this.saveBrowsingPreferences();
+      ({ types, sourceTree } = this.getBrowseOptions(allActors));
+    }
     const filteredByControls = this.filterByControls(allActors);
     const visibleActors = filteredByControls.slice(0, this.visibleLimit).map((entry) => {
       const favorite = this.favoriteActors.has(entry.uuid);
       return { ...entry, favorite, favoriteLabel: localize(favorite ? "RemoveFavorite" : "AddFavorite") };
     });
-    const { types, sourceTree } = this.getBrowseOptions(allActors);
     const activeSource = sourceTree.find((source) => source.selected) || sourceTree[0];
     const sourceLocation = localize(this.filters.source === "favorites" ? "FavoriteActorsLocation"
-      : !this.filters.source ? "AllActorSources"
+      : !this.filters.source ? (this.includesCompendiums() ? "AllActorSources" : "WorldActors")
       : this.filters.source.startsWith("compendium:") ? "ActorCompendium" : "WorldActors");
     const emptyFavorites = this.filters.source === "favorites"
       && sourceTree.find((source) => source.value === "favorites").count === 0;
@@ -142,6 +164,11 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       cardSize,
       canImportActors: canImportActors(),
       showTokenShadowSettings: game.user?.isGM === true,
+      includeCompendiumActors: this.includesCompendiums(),
+      canToggleCompendiums: Boolean(game.settings.get(MODULE_ID, "includeCompendiumActors"))
+        && !this.savingCompendiumPreference,
+      compendiumsToggleLabel: localize(!game.settings.get(MODULE_ID, "includeCompendiumActors")
+        ? "CompendiumsDisabled" : this.includesCompendiums() ? "HideCompendiumActors" : "IncludeCompendiumActors"),
       warnings: this.warnings,
       emptyMessage: localize(emptyFavorites ? "NoFavorites" : "NoActors")
     };
@@ -159,21 +186,29 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     });
 
     root.querySelector?.("[data-action='toggle-sources']")?.addEventListener("click", () => this.toggleSources(root));
+    root.querySelector?.("[data-action='toggle-compendiums']")?.addEventListener("click", (event) => {
+      void this.toggleCompendiums(event.currentTarget);
+    });
     root.querySelector?.("[data-action='configure-token-shadows']")?.addEventListener("click", () => {
       void openTokenShadowSettings();
     });
 
     root.querySelector?.("[data-action='search']")?.addEventListener("input", (event) => {
       this.filters.search = event.currentTarget.value || "";
+      void this.saveBrowsingPreferences();
       this.visibleLimit = GALLERY_PAGE_SIZE;
       this.restoreSearchFocus = true;
       debugLog("Search filter changed", { search: this.filters.search });
       clearTimeout(this.searchRenderTimer);
-      this.searchRenderTimer = setTimeout(() => this.render(false), 150);
+      this.searchRenderTimer = setTimeout(() => {
+        this.searchRenderTimer = null;
+        this.render(false);
+      }, 150);
     });
 
     root.querySelector?.("[data-action='type']")?.addEventListener("change", (event) => {
       this.filters.type = event.currentTarget.value || "";
+      void this.saveBrowsingPreferences();
       this.visibleLimit = GALLERY_PAGE_SIZE;
       debugLog("Type filter changed", { type: this.filters.type });
       this.render(false);
@@ -182,6 +217,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     for (const button of root.querySelectorAll?.("[data-action='source-tree']") || []) {
       button.addEventListener("click", (event) => {
         this.filters.source = event.currentTarget.dataset.source || "";
+        void this.saveBrowsingPreferences();
         this.visibleLimit = GALLERY_PAGE_SIZE;
         debugLog("Source tree filter changed", { source: this.filters.source });
         this.render(false);
@@ -192,6 +228,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       this.filters.search = "";
       this.filters.type = "";
       this.filters.source = "";
+      void this.saveBrowsingPreferences();
       this.visibleLimit = GALLERY_PAGE_SIZE;
       debugLog("Gallery filters cleared");
       this.render(false);
@@ -233,8 +270,39 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
   }
 
+  includesCompendiums() {
+    return Boolean(game.settings.get(MODULE_ID, "includeCompendiumActors"))
+      && game.settings.get(MODULE_ID, "browseCompendiumActors") !== false;
+  }
+
+  async toggleCompendiums(button) {
+    if (this.savingCompendiumPreference || !game.settings.get(MODULE_ID, "includeCompendiumActors")) return;
+    this.savingCompendiumPreference = true;
+    if (button) button.disabled = true;
+    try {
+      const include = !this.includesCompendiums();
+      await game.settings.set(MODULE_ID, "browseCompendiumActors", include);
+      if (!include && this.filters.source.startsWith("compendium:")) {
+        this.filters.source = "";
+        void this.saveBrowsingPreferences();
+      }
+      this.visibleLimit = GALLERY_PAGE_SIZE;
+      this.invalidateCache();
+      await this.render(false);
+    } catch (error) {
+      console.error(`${MODULE_ID} | Could not update compendium browsing.`, error);
+      ui.notifications.error(localize("CompendiumToggleFailed"));
+    } finally {
+      this.savingCompendiumPreference = false;
+      if (button) button.disabled = !game.settings.get(MODULE_ID, "includeCompendiumActors");
+      const currentButton = this.element?.querySelector?.("[data-action='toggle-compendiums']");
+      if (currentButton) currentButton.disabled = !game.settings.get(MODULE_ID, "includeCompendiumActors");
+    }
+  }
+
   toggleSources(root) {
     this.sourcesCollapsed = !this.sourcesCollapsed;
+    void this.saveBrowsingPreferences();
     root.querySelector?.(".mk-actors__body")?.classList.toggle("is-sources-collapsed", this.sourcesCollapsed);
     const button = root.querySelector?.("[data-action='toggle-sources']");
     const label = localize(this.sourcesCollapsed ? "ExpandSources" : "CollapseSources");
@@ -249,6 +317,35 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   readFavorites() {
     const saved = game.settings?.get?.(MODULE_ID, "favoriteActors");
     return new Set(Array.isArray(saved) ? saved.filter((uuid) => typeof uuid === "string" && uuid.length) : []);
+  }
+
+  readBrowsingPreferences() {
+    const saved = game.settings?.get?.(MODULE_ID, "browsingPreferences");
+    return {
+      search: typeof saved?.search === "string" ? saved.search : "",
+      type: typeof saved?.type === "string" ? saved.type : "",
+      source: typeof saved?.source === "string" ? saved.source : "",
+      sourcesCollapsed: saved?.sourcesCollapsed === true
+    };
+  }
+
+  saveBrowsingPreferences() {
+    if (!game.settings?.set) return Promise.resolve();
+    const preferences = { ...this.filters, sourcesCollapsed: this.sourcesCollapsed };
+    const revision = ++this.browsingPreferencesRevision;
+    // Serialize writes and skip obsolete queued snapshots while typing.
+    this.browsingPreferencesSave = (this.browsingPreferencesSave ?? Promise.resolve()).then(async () => {
+      if (revision !== this.browsingPreferencesRevision) return;
+      try {
+        await game.settings.set(MODULE_ID, "browsingPreferences", preferences);
+        this.browsingPreferencesWarningShown = false;
+      } catch (error) {
+        console.error(`${MODULE_ID} | Could not save browsing preferences.`, error);
+        if (!this.browsingPreferencesWarningShown) ui.notifications.warn(localize("BrowsingPreferencesSaveFailed"));
+        this.browsingPreferencesWarningShown = true;
+      }
+    });
+    return this.browsingPreferencesSave;
   }
 
   async onToggleFavorite(event) {
@@ -310,15 +407,15 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     const warnings = [];
     debugLog("Loading Actor entries", {
       includeWorldActors: game.settings.get(MODULE_ID, "includeWorldActors"),
-      includeCompendiumActors: game.settings.get(MODULE_ID, "includeCompendiumActors")
+      includeCompendiumActors: this.includesCompendiums()
     });
 
     if (game.settings.get(MODULE_ID, "includeWorldActors")) {
-      entries.push(...this.getWorldActorEntries());
+      for (const entry of this.getWorldActorEntries()) entries.push(entry);
     }
 
-    if (game.settings.get(MODULE_ID, "includeCompendiumActors")) {
-      entries.push(...await this.getCompendiumActorEntries(warnings));
+    if (this.includesCompendiums()) {
+      for (const entry of await this.getCompendiumActorEntries(warnings, cacheVersion)) entries.push(entry);
     }
 
     // An invalidated load must not replace newer results or report stale warnings.
@@ -413,7 +510,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     return folder._source?.folder || "";
   }
 
-  async getCompendiumActorEntries(warnings = this.warnings) {
+  async getCompendiumActorEntries(warnings = this.warnings, cacheVersion = this.cacheVersion) {
     const onlyVisiblePacks = game.settings.get(MODULE_ID, "showOnlyVisiblePacks");
     const packs = Array.from(game.packs).filter((pack) => {
       const documentName = pack.documentName || pack.metadata?.type;
@@ -422,35 +519,44 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       return true;
     });
 
-    const packEntries = await Promise.all(packs.map(async (pack) => {
-      try {
-        const index = await pack.getIndex({ fields: ["img", "type", "folder", "prototypeToken.texture.src"] });
-        debugLog("Compendium Actor index loaded", { pack: pack.collection, count: index.size ?? index.length ?? 0 });
-        const entries = [];
-        for (const entry of index) {
-          const type = String(entry.type || "");
+    const packEntries = new Array(packs.length);
+    let nextPack = 0;
+    const loadPacks = async () => {
+      while (nextPack < packs.length && cacheVersion === this.cacheVersion) {
+        const packIndex = nextPack++;
+        const pack = packs[packIndex];
+        try {
+          const index = await pack.getIndex({ fields: ["img", "type", "folder", "prototypeToken.texture.src"] });
+          if (cacheVersion !== this.cacheVersion) return;
+          debugLog("Compendium Actor index loaded", { pack: pack.collection, count: index.size ?? index.length ?? 0 });
+          const entries = [];
           const sourceLabel = pack.metadata?.label || pack.title || pack.collection;
-          entries.push({
-            id: entry._id,
-            uuid: getUuidForIndex(pack, entry),
-            name: entry.name || game.i18n.localize("MKACTORS.UnnamedActor"),
-            img: getActorImage(entry),
-            type,
-            typeLabel: titleCase(type),
-            sourceKind: "compendium",
-            sourceId: pack.collection,
-            sourceLabel,
-            packLabel: sourceLabel,
-            searchText: this.buildSearchText(entry.name, type, sourceLabel, pack.collection)
-          });
+          for (const entry of index) {
+            const type = String(entry.type || "");
+            entries.push({
+              id: entry._id,
+              uuid: getUuidForIndex(pack, entry),
+              name: entry.name || game.i18n.localize("MKACTORS.UnnamedActor"),
+              img: getActorImage(entry),
+              type,
+              typeLabel: titleCase(type),
+              sourceKind: "compendium",
+              sourceId: pack.collection,
+              sourceLabel,
+              packLabel: sourceLabel,
+              searchText: this.buildSearchText(entry.name, type, sourceLabel, pack.collection)
+            });
+          }
+          packEntries[packIndex] = entries;
+        } catch (err) {
+          if (cacheVersion !== this.cacheVersion) return;
+          debugLog("Compendium Actor index failed", { pack: pack.collection, error: err });
+          warnings.push({ pack: pack.collection, error: err });
+          packEntries[packIndex] = [];
         }
-        return entries;
-      } catch (err) {
-        debugLog("Compendium Actor index failed", { pack: pack.collection, error: err });
-        warnings.push({ pack: pack.collection, error: err });
-        return [];
       }
-    }));
+    };
+    await Promise.all(Array.from({ length: Math.min(COMPENDIUM_INDEX_CONCURRENCY, packs.length) }, () => loadPacks()));
 
     const entries = packEntries.flat();
     debugLog("Compendium Actor entries loaded", { count: entries.length, onlyVisiblePacks });
@@ -716,6 +822,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       onImport: async () => {
         clearTimeout(this.searchRenderTimer);
         this.filters = { search: "", type: "", source: "world" };
+        void this.saveBrowsingPreferences();
         this.visibleLimit = GALLERY_PAGE_SIZE;
         this.invalidateCache();
         this.pendingGridAnchor = null;

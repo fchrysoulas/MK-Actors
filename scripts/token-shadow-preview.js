@@ -17,11 +17,15 @@ export class TokenShadowPreview {
       const { Renderer, Container, Graphics } = PIXI;
       this.renderer = new Renderer({ view: this.canvas, width: 480, height: 220, backgroundAlpha: 0, antialias: true });
       this.stage = new Container();
-      const frame = new Graphics().lineStyle(1, 0xdda85b, 0.4).drawRect(0, 0, 100, 100);
+      const frame = new Graphics();
+      this.stage.addChild(frame);
+      frame.lineStyle(1, 0xdda85b, 0.4).drawRect(0, 0, 100, 100);
       this.shadowState = { shadow: new Graphics(), blurFilter: null, drawState: null };
-      const pawn = new Graphics().beginFill(0xf1c171).drawCircle(50, 22, 13)
+      this.stage.addChild(this.shadowState.shadow);
+      const pawn = new Graphics();
+      this.stage.addChild(pawn);
+      pawn.beginFill(0xf1c171).drawCircle(50, 22, 13)
         .drawRoundedRect(33, 40, 34, 34, 12).drawRoundedRect(26, 73, 48, 17, 5).endFill();
-      this.stage.addChild(frame, this.shadowState.shadow, pawn);
       this.readValues();
       this.render();
     } catch (error) {
@@ -79,15 +83,26 @@ export class TokenShadowPreview {
   }
 
   destroyGraphics() {
-    if (this.shadowState) {
-      this.shadowState.shadow.filters = null;
-      this.shadowState.blurFilter?.destroy();
-      this.shadowState = null;
-    }
-    this.stage?.destroy({ children: true, texture: false, baseTexture: false });
+    const { shadowState, stage, renderer } = this;
+    this.shadowState = null;
     this.stage = null;
-    this.renderer?.destroy(false);
     this.renderer = null;
+    try {
+      if (shadowState) shadowState.shadow.filters = null;
+    } catch (error) {
+      debugLog("Token shadow preview filter cleanup failed", { error });
+    }
+    for (const [resource, options] of [
+      [shadowState?.blurFilter, undefined],
+      [stage, { children: true, texture: false, baseTexture: false }],
+      [renderer, false]
+    ]) {
+      try {
+        resource?.destroy(options);
+      } catch (error) {
+        debugLog("Token shadow preview cleanup failed", { error });
+      }
+    }
   }
 
   destroy() {

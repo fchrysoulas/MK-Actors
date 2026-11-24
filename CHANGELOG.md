@@ -8,6 +8,17 @@ This project follows semantic versioning where practical:
 - `MINOR` versions add backwards-compatible features.
 - `PATCH` versions fix bugs or polish existing behavior.
 
+## 0.10.0 - 2026-11-24
+
+- Moved Actor Editor settings beside the image preview into the right third of the window, keeping Name above the image. Width/Height and anchor X/Y stay side by side, and setting descriptions appear on hover with screen-reader support.
+- Added an image rotation handle and numeric angle control with keyboard adjustments, Shift snapping to 15 degrees, and drag cancellation. Rotation saves to the prototype token; changing a locked image's angle enables artwork rotation.
+- Added a compendium toggle to the gallery toolbar. Its preference is saved per client and respects world settings and access permissions.
+- Restored search, Actor type, selected source, and Sources sidebar state after reopening or reloading. Unavailable saved types or sources fall back to All Types or All Sources.
+- Added an amber image-loading warning in Actor Editor while preserving the entered path for correction and displaying a placeholder preview.
+- Prevented overlapping Actor Editor saves from repeated clicks or Enter presses. Failed saves preserve the draft and allow retry.
+- Limited concurrent compendium indexing to four requests per gallery load, stopped obsolete queued requests after refresh, and avoided argument-count errors when combining very large Actor collections.
+- Cancelled pending search redraws when the gallery closes and strengthened shadow preview and Scene shadow cleanup, including partial initialization, rerendering, and teardown failures.
+
 ## 0.9.0 - 2026-11-12
 
 - Fixed missing token shadows caused by transparent bitmap caches in Foundry's canvas renderer. Shadows now render directly while retaining geometry and blur-filter reuse.

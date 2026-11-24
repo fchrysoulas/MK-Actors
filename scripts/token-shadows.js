@@ -48,16 +48,28 @@ function getBlurFilterClass() {
 export function removeTokenShadow(token) {
   const state = shadowStates.get(token);
   if (!state) return;
-  const { shadow, blurFilter } = state;
-  if (!shadow.destroyed && "cacheAsBitmap" in shadow) shadow.cacheAsBitmap = false;
-  shadow.filters = null;
-  try { blurFilter?.destroy?.(); } catch (_error) { /* The canvas may have already destroyed the filter. */ }
-  if (!shadow.destroyed) {
-    shadow.parent?.removeChild(shadow);
-    shadow.destroy({ children: true, texture: false, baseTexture: false });
-  }
   shadowStates.delete(token);
   shadowTokens.delete(token);
+  const { shadow, blurFilter } = state;
+  try {
+    if (!shadow.destroyed && "cacheAsBitmap" in shadow) shadow.cacheAsBitmap = false;
+    shadow.filters = null;
+  } catch (error) {
+    debugLog("Token shadow filter cleanup failed", { error });
+  }
+  try { blurFilter?.destroy?.(); } catch (_error) { /* The canvas may have already destroyed the filter. */ }
+  if (!shadow.destroyed) {
+    try {
+      shadow.parent?.removeChild(shadow);
+    } catch (error) {
+      debugLog("Token shadow removal failed", { error });
+    }
+    try {
+      shadow.destroy({ children: true, texture: false, baseTexture: false });
+    } catch (error) {
+      debugLog("Token shadow graphics cleanup failed", { error });
+    }
+  }
 }
 
 function ensureTokenShadow(token) {

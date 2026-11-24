@@ -1,6 +1,7 @@
 export const MODULE_ID = "mk-actors";
 export const DEFAULT_ACTOR_IMAGE = "icons/svg/mystery-man.svg";
 export const GALLERY_PAGE_SIZE = 200;
+export const COMPENDIUM_INDEX_CONCURRENCY = 4;
 export const MK_SHADOWDARK_ID = "mk-shadowdark";
 export const TOKEN_SHADOW_SETTINGS = Object.freeze([
   { key: "tokenShadowsEnabled", label: "TokenShadowsEnabled", type: Boolean, default: false },

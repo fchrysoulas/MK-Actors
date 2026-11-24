@@ -42,6 +42,14 @@ export function registerSettings() {
     default: []
   });
 
+  game.settings.register(MODULE_ID, "browsingPreferences", {
+    name: game.i18n.localize("MKACTORS.BrowsingPreferences"),
+    scope: "client",
+    config: false,
+    type: Object,
+    default: { search: "", type: "", source: "", sourcesCollapsed: false }
+  });
+
   game.settings.register(MODULE_ID, "includeWorldActors", {
     name: game.i18n.localize("MKACTORS.IncludeWorldActors"),
     hint: game.i18n.localize("MKACTORS.IncludeWorldActorsHint"),
@@ -50,6 +58,14 @@ export function registerSettings() {
     type: Boolean,
     default: true,
     onChange: (value) => refreshAfterSettingChange("includeWorldActors", value)
+  });
+
+  game.settings.register(MODULE_ID, "browseCompendiumActors", {
+    name: game.i18n.localize("MKACTORS.IncludeCompendiumActors"),
+    scope: "client",
+    config: false,
+    type: Boolean,
+    default: true
   });
 
   game.settings.register(MODULE_ID, "includeCompendiumActors", {

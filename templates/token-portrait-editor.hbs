@@ -1,144 +1,178 @@
 <section class="mk-actors__inspector" aria-label="{{editor.labels.title}}">
   <form class="mk-actors__inspector-form" data-action="token-editor-form" data-uuid="{{editor.uuid}}">
-    <div class="mk-actors__inspector-scroll">
-      <div class="mk-actors__inspector-section">
-        <label for="{{id}}-actor-name">{{editor.labels.name}}</label>
-        <input id="{{id}}-actor-name"
-               name="actorName"
-               type="text"
-               value="{{editor.actorName}}"
-               autocomplete="off"
-               aria-describedby="{{id}}-actor-name-hint"
-               required>
-        <p id="{{id}}-actor-name-hint" class="notes">{{editor.labels.nameHint}}</p>
-      </div>
-
-      <div class="mk-actors__inspector-section">
-        <div class="mk-actors-token-editor__preview-heading">
-          <span>{{editor.labels.preview}}</span>
-          <button type="button" class="mk-actors-token-editor__reset"
-                  data-action="reset-token-preview"
-                  title="{{editor.labels.resetPreview}}" aria-label="{{editor.labels.resetPreview}}">
-            <i class="fas fa-rotate-left" aria-hidden="true"></i>
-          </button>
-        </div>
-        <div class="mk-actors__inspector-preview" data-role="token-preview-stage" tabindex="0" role="group"
-             aria-label="{{editor.labels.previewControls}}" aria-describedby="{{id}}-preview-hint">
-          <img src="{{editor.previewImage}}" alt="{{editor.name}}" draggable="false"
-               data-role="token-editor-preview">
-          <div class="mk-actors-token-editor__token-frame" data-role="token-preview-frame" aria-hidden="true"></div>
-          <button type="button" class="mk-actors-token-editor__scale-handle"
-                  data-action="scale-token-preview"
-                  title="{{editor.labels.scalePreview}}" aria-label="{{editor.labels.scalePreview}}">
-            <i class="fas fa-up-right-and-down-left-from-center" aria-hidden="true"></i>
-          </button>
-        </div>
-        <p id="{{id}}-preview-hint" class="notes">{{editor.labels.previewHint}}</p>
-      </div>
-
-      <div class="mk-actors__inspector-section">
-        <label for="{{id}}-portrait-img">{{editor.labels.imagePath}}</label>
-        <div class="mk-actors-token-editor__row">
-          <input id="{{id}}-portrait-img"
-                 name="portraitImg"
+    <div class="mk-actors__inspector-scroll mk-actors-token-editor__layout">
+      <div class="mk-actors-token-editor__visual">
+        <div class="mk-actors__inspector-section" title="{{editor.labels.nameHint}}">
+          <label for="{{id}}-actor-name">{{editor.labels.name}}</label>
+          <input id="{{id}}-actor-name"
+                 name="actorName"
                  type="text"
-                 value="{{editor.portraitImage}}"
+                 value="{{editor.actorName}}"
+                 autocomplete="off"
+                 aria-describedby="{{id}}-actor-name-hint"
                  required>
-          <button type="button"
-                  class="mk-actors-token-editor__browse"
-                  data-action="browse-token-image"
-                  title="{{editor.labels.browseImage}}"
-                  aria-label="{{editor.labels.browseImage}}">
-            <i class="fas fa-folder-open"></i>
-          </button>
+          <p id="{{id}}-actor-name-hint" class="mk-actors__sr-only">{{editor.labels.nameHint}}</p>
         </div>
-        <p class="notes">{{editor.labels.imagePathPortraitNote}}</p>
-      </div>
 
-      <div class="mk-actors__inspector-section">
-        <label>{{editor.labels.dimensionsGridSpaces}}</label>
-        <div class="mk-actors-token-editor__dimensions">
-          <label>
-            <span>{{editor.labels.width}}</span>
-            <input id="{{id}}-token-width"
-                   name="tokenWidth"
-                   type="number"
-                   min="0.5"
-                   step="any"
-                   value="{{editor.width}}"
-                   required>
-          </label>
-          <label>
-            <span>{{editor.labels.height}}</span>
-            <input id="{{id}}-token-height"
-                   name="tokenHeight"
-                   type="number"
-                   min="0.5"
-                   step="any"
-                   value="{{editor.height}}"
-                   required>
-          </label>
+        <div class="mk-actors__inspector-section" title="{{editor.labels.previewHint}}">
+          <div class="mk-actors-token-editor__preview-heading">
+            <span>{{editor.labels.preview}}</span>
+            <button type="button" class="mk-actors-token-editor__reset"
+                    data-action="reset-token-preview"
+                    title="{{editor.labels.resetPreview}}" aria-label="{{editor.labels.resetPreview}}">
+              <i class="fas fa-rotate-left" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="mk-actors__inspector-preview" data-role="token-preview-stage" tabindex="0" role="group"
+               aria-label="{{editor.labels.previewControls}}" aria-describedby="{{id}}-preview-hint">
+            <img src="{{editor.previewImage}}" alt="{{editor.name}}" draggable="false"
+                 data-role="token-editor-preview">
+            <div class="mk-actors-token-editor__token-frame" data-role="token-preview-frame" aria-hidden="true"></div>
+            <button type="button" class="mk-actors-token-editor__scale-handle"
+                    data-action="scale-token-preview"
+                    title="{{editor.labels.scalePreview}}" aria-label="{{editor.labels.scalePreview}}">
+              <i class="fas fa-up-right-and-down-left-from-center" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="mk-actors-token-editor__rotation-handle"
+                    data-action="rotate-token-preview"
+                    title="{{editor.labels.rotatePreview}}" aria-label="{{editor.labels.rotatePreview}}">
+              <i class="fas fa-rotate-right" aria-hidden="true"></i>
+            </button>
+          </div>
+          <p id="{{id}}-preview-hint" class="mk-actors__sr-only">{{editor.labels.previewHint}}</p>
         </div>
-        <p class="notes">{{editor.labels.fitModeHeightNote}}</p>
       </div>
 
-      <div class="mk-actors__inspector-section">
-        <label for="{{id}}-token-fit">{{editor.labels.imageFitMode}}</label>
-        <select id="{{id}}-token-fit" name="tokenFit">
-          {{#each editor.fitOptions}}
-            <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
-          {{/each}}
-        </select>
-        <p class="notes">{{editor.labels.imageFitModeHint}}</p>
-      </div>
-
-      <div class="mk-actors__inspector-section">
-        <label>{{editor.labels.anchor}}</label>
-        <div class="mk-actors-token-editor__dimensions">
-          <label>
-            <span>{{editor.labels.x}}</span>
-            <input id="{{id}}-token-anchor-x"
-                   name="tokenAnchorX"
-                   type="number"
-                   min="0"
-                   max="1"
-                   step="any"
-                   value="{{editor.anchorX}}"
+      <div class="mk-actors-token-editor__settings">
+        <div class="mk-actors__inspector-section" title="{{editor.labels.imagePathPortraitNote}}">
+          <div class="mk-actors-token-editor__image-heading">
+            <label for="{{id}}-portrait-img">{{editor.labels.imagePath}}</label>
+            <span id="{{id}}-portrait-img-warning" class="mk-actors-token-editor__image-warning"
+                  data-role="token-image-warning" role="status" tabindex="0"
+                  title="{{editor.labels.imageLoadFailed}}" hidden>
+              <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+              <span class="mk-actors__sr-only">{{editor.labels.imageLoadFailed}}</span>
+            </span>
+          </div>
+          <div class="mk-actors-token-editor__row">
+            <input id="{{id}}-portrait-img"
+                   name="portraitImg"
+                   type="text"
+                   value="{{editor.portraitImage}}"
+                   aria-describedby="{{id}}-portrait-img-hint"
+                   aria-errormessage="{{id}}-portrait-img-warning"
                    required>
-          </label>
-          <label>
-            <span>{{editor.labels.y}}</span>
-            <input id="{{id}}-token-anchor-y"
-                   name="tokenAnchorY"
-                   type="number"
-                   min="0"
-                   max="1"
-                   step="any"
-                   value="{{editor.anchorY}}"
-                   required>
-          </label>
+            <button type="button"
+                    class="mk-actors-token-editor__browse"
+                    data-action="browse-token-image"
+                    title="{{editor.labels.browseImage}}"
+                    aria-label="{{editor.labels.browseImage}}">
+              <i class="fas fa-folder-open"></i>
+            </button>
+          </div>
+          <p id="{{id}}-portrait-img-hint" class="mk-actors__sr-only">{{editor.labels.imagePathPortraitNote}}</p>
         </div>
-        <p class="notes">{{editor.labels.anchorHint}}</p>
-      </div>
 
-      <div class="mk-actors__inspector-section">
-        <label for="{{id}}-token-scale">{{editor.labels.scaleRatio}}</label>
-        <div class="mk-actors-token-editor__scale">
-          <input id="{{id}}-token-scale-range"
-                 name="tokenScaleRange"
-                 type="range"
-                 min="0.2"
-                 max="3"
-                 step="0.05"
-                 value="{{editor.scale}}">
-          <input id="{{id}}-token-scale"
-                 name="tokenScale"
-                 type="number"
-                 min="0.2"
-                 max="3"
-                 step="any"
-                 value="{{editor.scale}}"
-                 required>
+        <div class="mk-actors__inspector-section" title="{{editor.labels.fitModeHeightNote}}">
+          <label>{{editor.labels.dimensionsGridSpaces}}</label>
+          <div class="mk-actors-token-editor__dimensions">
+            <label>
+              <span>{{editor.labels.width}}</span>
+              <input id="{{id}}-token-width"
+                     name="tokenWidth"
+                     type="number"
+                     min="0.5"
+                     step="any"
+                     value="{{editor.width}}"
+                     aria-describedby="{{id}}-dimensions-hint"
+                     required>
+            </label>
+            <label>
+              <span>{{editor.labels.height}}</span>
+              <input id="{{id}}-token-height"
+                     name="tokenHeight"
+                     type="number"
+                     min="0.5"
+                     step="any"
+                     value="{{editor.height}}"
+                     aria-describedby="{{id}}-dimensions-hint"
+                     required>
+            </label>
+          </div>
+          <p id="{{id}}-dimensions-hint" class="mk-actors__sr-only">{{editor.labels.fitModeHeightNote}}</p>
+        </div>
+
+        <div class="mk-actors__inspector-section" title="{{editor.labels.imageFitModeHint}}">
+          <label for="{{id}}-token-fit">{{editor.labels.imageFitMode}}</label>
+          <select id="{{id}}-token-fit" name="tokenFit" aria-describedby="{{id}}-token-fit-hint">
+            {{#each editor.fitOptions}}
+              <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+          </select>
+          <p id="{{id}}-token-fit-hint" class="mk-actors__sr-only">{{editor.labels.imageFitModeHint}}</p>
+        </div>
+
+        <div class="mk-actors__inspector-section" title="{{editor.labels.anchorHint}}">
+          <label>{{editor.labels.anchor}}</label>
+          <div class="mk-actors-token-editor__dimensions">
+            <label>
+              <span>{{editor.labels.x}}</span>
+              <input id="{{id}}-token-anchor-x"
+                     name="tokenAnchorX"
+                     type="number"
+                     min="0"
+                     max="1"
+                     step="any"
+                     value="{{editor.anchorX}}"
+                     aria-describedby="{{id}}-anchor-hint"
+                     required>
+            </label>
+            <label>
+              <span>{{editor.labels.y}}</span>
+              <input id="{{id}}-token-anchor-y"
+                     name="tokenAnchorY"
+                     type="number"
+                     min="0"
+                     max="1"
+                     step="any"
+                     value="{{editor.anchorY}}"
+                     aria-describedby="{{id}}-anchor-hint"
+                     required>
+            </label>
+          </div>
+          <p id="{{id}}-anchor-hint" class="mk-actors__sr-only">{{editor.labels.anchorHint}}</p>
+        </div>
+
+        <div class="mk-actors__inspector-section" title="{{editor.labels.scaleHint}}">
+          <label for="{{id}}-token-scale">{{editor.labels.scaleRatio}}</label>
+          <div class="mk-actors-token-editor__scale">
+            <input id="{{id}}-token-scale-range"
+                   name="tokenScaleRange"
+                   type="range"
+                   min="0.2"
+                   max="3"
+                   step="0.05"
+                   aria-describedby="{{id}}-scale-hint"
+                   value="{{editor.scale}}">
+            <input id="{{id}}-token-scale"
+                   name="tokenScale"
+                   type="number"
+                   aria-describedby="{{id}}-scale-hint"
+                   min="0.2"
+                   max="3"
+                   step="any"
+                   value="{{editor.scale}}"
+                   required>
+          </div>
+          <p id="{{id}}-scale-hint" class="mk-actors__sr-only">{{editor.labels.scaleHint}}</p>
+        </div>
+
+        <div class="mk-actors__inspector-section" title="{{editor.labels.rotationHint}}">
+          <label for="{{id}}-token-rotation">{{editor.labels.rotation}}</label>
+          <input id="{{id}}-token-rotation" name="tokenRotation" type="number"
+                 min="0" max="360" step="1" value="{{editor.rotation}}"
+                 aria-describedby="{{id}}-token-rotation-hint" required>
+          <p id="{{id}}-token-rotation-hint" class="mk-actors__sr-only">{{editor.labels.rotationHint}}</p>
         </div>
       </div>
     </div>

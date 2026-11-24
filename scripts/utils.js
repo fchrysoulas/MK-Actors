@@ -13,3 +13,8 @@ export function normalizeNumber(value, fallback, { min = -Infinity, max = Infini
   number = Math.min(max, Math.max(min, number));
   return Number(number.toFixed(10));
 }
+
+export function normalizeAngle(value, fallback = 0) {
+  const angle = normalizeNumber(value, fallback, { step: 1 });
+  return ((angle % 360) + 360) % 360;
+}

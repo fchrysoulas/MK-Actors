@@ -2,6 +2,13 @@
   <header class="mk-actors__toolbar">
     <div class="mk-actors__toolbar-controls">
       <div class="mk-actors__toolbar-actions">
+        <button type="button" data-action="toggle-compendiums"
+                class="mk-actors__compendiums-toggle {{#if includeCompendiumActors}}is-active{{/if}}"
+                title="{{compendiumsToggleLabel}}" aria-label="{{compendiumsToggleLabel}}"
+                aria-pressed="{{#if includeCompendiumActors}}true{{else}}false{{/if}}"
+                {{#unless canToggleCompendiums}}disabled{{/unless}}>
+          <i class="fas fa-book-atlas" aria-hidden="true"></i>
+        </button>
         {{#if canImportActors}}
           <button type="button" data-action="import-actor"
                   title="{{localize 'MKACTORS.ImportActor'}}" aria-label="{{localize 'MKACTORS.ImportActor'}}">
