@@ -1,6 +1,8 @@
 import { MODULE_ID } from "./constants.js";
 import { debugLog } from "./debug.js";
 import { MKActorsApi } from "./api.js";
+import { canModifyActor } from "./actor-helpers.js";
+import { localize } from "./utils.js";
 
 let galleryRefreshTimer = null;
 
@@ -109,6 +111,45 @@ export function addDirectoryButton(_app, html) {
   });
   header.appendChild(button);
   debugLog("Actor Directory button added");
+}
+
+export function addActorContextOptions(app, menuItems) {
+  if (!app?.collection || app.collection !== game.actors || !Array.isArray(menuItems)) return;
+  if (menuItems.some((item) => item.classes === "mk-actors-open-editor")) return;
+
+  const getActor = (target) => {
+    const element = target?.[0] || target;
+    const entry = element?.closest?.("[data-entry-id], [data-document-id]") || element;
+    const id = entry?.dataset?.entryId || entry?.dataset?.documentId;
+    return id ? app.collection.get(id) : null;
+  };
+  const canEdit = (target) => {
+    const actor = getActor(target);
+    return Boolean(actor && canModifyActor(actor));
+  };
+  const openEditor = async (target) => {
+    const actor = getActor(target);
+    if (!actor) {
+      ui.notifications.warn(localize("CannotResolveActor"));
+      return;
+    }
+    try {
+      return await MKActorsApi.openActorEditor(actor.uuid);
+    } catch (error) {
+      console.error(`${MODULE_ID} | Could not open Actor Editor.`, error);
+      ui.notifications.error(game.i18n.format("MKACTORS.ActorEditorOpenFailed", { message: error.message ?? error }));
+    }
+  };
+  const label = localize("OpenActorEditor");
+  // v13 uses name/condition/callback; v14 uses label/visible/onClick.
+  menuItems.push({
+    name: label, label,
+    icon: '<i class="fas fa-user-pen"></i>',
+    classes: "mk-actors-open-editor",
+    condition: canEdit, visible: canEdit,
+    callback: openEditor,
+    onClick: (_event, target) => openEditor(target)
+  });
 }
 
 function getControlName(control, key = "") {

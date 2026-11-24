@@ -45,7 +45,7 @@ globalThis.ui = {
 const { MKActorsApi } = await import("../scripts/api.js");
 const { MKActorsApp } = await import("../scripts/gallery-app.js");
 const { MKTokenPortraitEditor } = await import("../scripts/token-portrait-editor.js");
-const { addSceneControlButton, ensurePortraitSyncedToTokenImage, scheduleActorGalleryRefresh } = await import("../scripts/hooks.js");
+const { addActorContextOptions, addSceneControlButton, ensurePortraitSyncedToTokenImage, scheduleActorGalleryRefresh } = await import("../scripts/hooks.js");
 const { resolveActor } = await import("../scripts/documents.js");
 const { resolveFilePickerClass } = await import("../scripts/file-picker.js");
 const { registerSettings } = await import("../scripts/settings.js");
@@ -1648,6 +1648,103 @@ test("failed Actor resolution prevents popup opening and allows sheet actions to
   assert.equal(warning, "MKACTORS.CannotResolveActor");
   await app.openActorSheet("Compendium.missing.actors.Actor.one");
   assert.equal(warning, "MKACTORS.CannotResolveActor");
+});
+
+test("the registered Actor menu opens and reuses an editor through v13 and v14 callbacks without opening the gallery", async (t) => {
+  const priorHooks = globalThis.Hooks;
+  const priorActors = game.actors;
+  const priorFromUuid = globalThis.fromUuid;
+  const priorApp = MKActorsApi.app;
+  t.after(() => {
+    globalThis.Hooks = priorHooks;
+    globalThis.fromUuid = priorFromUuid;
+    game.actors = priorActors;
+    MKActorsApi.app = priorApp;
+  });
+  mockActorSources(t, async () => []);
+  const hooks = new Map();
+  globalThis.Hooks = { once() {}, on: (name, handler) => hooks.set(name, handler) };
+  await import("../scripts/main.js");
+  assert.equal(hooks.get("getActorContextOptions"), addActorContextOptions);
+  const actor = { id: "one", uuid: "Actor.one", documentName: "Actor", isOwner: true };
+  game.actors = new Map([[actor.id, actor]]);
+  globalThis.fromUuid = async () => actor;
+  MKActorsApi.app = null;
+  const renderGallery = t.mock.method(MKActorsApp.prototype, "render", () => {
+    throw new Error("The menu must not open the gallery");
+  });
+  const directory = { collection: game.actors };
+  const menu = [];
+  hooks.get("getActorContextOptions")(directory, menu);
+  hooks.get("getActorContextOptions")(directory, menu);
+  assert.equal(menu.length, 1);
+  assert.equal(menu[0].label, "MKACTORS.OpenActorEditor");
+  assert.equal(menu[0].name, "MKACTORS.OpenActorEditor");
+  const entry = { dataset: { entryId: actor.id } };
+  const child = { closest: () => entry };
+  assert.equal(menu[0].condition({ 0: entry }), true);
+  assert.equal(menu[0].visible(child), true);
+  const editor = await menu[0].callback({ 0: entry });
+  assert.ok(editor instanceof MKTokenPortraitEditor);
+  assert.equal(editor.rendered, true);
+  const focus = t.mock.method(editor, "bringToFront");
+  assert.strictEqual(await menu[0].onClick({}, child), editor);
+  assert.equal(focus.mock.callCount(), 1);
+  assert.equal(MKActorsApi.app.tokenEditors.size, 1);
+  assert.equal(renderGallery.mock.callCount(), 0);
+  await editor.close();
+});
+
+test("Actor menu visibility and opening respect changed permissions and removed Actors", async (t) => {
+  const priorActors = game.actors;
+  const priorFromUuid = globalThis.fromUuid;
+  const priorApp = MKActorsApi.app;
+  t.after(() => {
+    game.actors = priorActors;
+    globalThis.fromUuid = priorFromUuid;
+    MKActorsApi.app = priorApp;
+  });
+  mockActorSources(t, async () => []);
+  const actor = { id: "one", uuid: "Actor.one", documentName: "Actor", isOwner: true };
+  game.actors = new Map([[actor.id, actor]]);
+  globalThis.fromUuid = async () => game.actors.get(actor.id);
+  MKActorsApi.app = null;
+  const menu = [];
+  addActorContextOptions({ collection: game.actors }, menu);
+  const entry = { dataset: { documentId: actor.id } };
+  assert.equal(menu[0].visible(entry), true);
+  actor.isOwner = false;
+  assert.equal(menu[0].visible(entry), false);
+  const warning = t.mock.method(ui.notifications, "warn");
+  await menu[0].onClick({}, entry);
+  assert.equal(warning.mock.calls[0].arguments[0], "MKACTORS.CannotModifyActor");
+  assert.equal(MKActorsApi.app.tokenEditors.size, 0);
+  game.actors.delete(actor.id);
+  assert.equal(menu[0].visible(entry), false);
+  await menu[0].callback(entry);
+  assert.equal(warning.mock.calls[1].arguments[0], "MKACTORS.CannotResolveActor");
+  const unrelatedMenu = [];
+  addActorContextOptions({ collection: new Map() }, unrelatedMenu);
+  addActorContextOptions({}, unrelatedMenu);
+  assert.equal(unrelatedMenu.length, 0);
+});
+
+test("Actor menu failures show a localized error and permit another attempt", async (t) => {
+  const priorActors = game.actors;
+  t.after(() => { game.actors = priorActors; });
+  game.actors = new Map([["one", { uuid: "Actor.one", isOwner: true }]]);
+  const menu = [];
+  addActorContextOptions({ collection: game.actors }, menu);
+  const open = t.mock.method(MKActorsApi, "openActorEditor", async () => { throw new Error("Render failed"); });
+  const error = t.mock.method(ui.notifications, "error");
+  t.mock.method(console, "error", () => {});
+  const target = { dataset: { entryId: "one" } };
+  await menu[0].onClick({}, target);
+  assert.equal(error.mock.callCount(), 1);
+  assert.equal(error.mock.calls[0].arguments[0], "MKACTORS.ActorEditorOpenFailed");
+  open.mock.mockImplementation(async () => "opened");
+  assert.equal(await menu[0].callback(target), "opened");
+  assert.equal(open.mock.callCount(), 2);
 });
 
 test("only a card context menu opens the popup and repeated requests focus it", async (t) => {

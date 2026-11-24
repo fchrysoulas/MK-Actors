@@ -4,6 +4,7 @@ import { debugLog } from "./debug.js";
 import { registerKeybinding, registerSettings } from "./settings.js";
 import { refreshTokenShadows, registerTokenShadowHooks } from "./token-shadows.js";
 import {
+  addActorContextOptions,
   addDirectoryButton,
   addSceneControlButton,
   ensurePortraitSyncedToTokenImage,
@@ -27,6 +28,7 @@ Hooks.once("ready", () => {
 });
 
 Hooks.on("renderActorDirectory", addDirectoryButton);
+Hooks.on("getActorContextOptions", addActorContextOptions);
 registerTokenShadowHooks();
 Hooks.on("getSceneControlButtons", addSceneControlButton);
 Hooks.on("preUpdateActor", syncPortraitToTokenImage);

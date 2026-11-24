@@ -2,16 +2,33 @@
   <form class="mk-actors__inspector-form" data-action="token-editor-form" data-uuid="{{editor.uuid}}">
     <div class="mk-actors__inspector-scroll mk-actors-token-editor__layout">
       <div class="mk-actors-token-editor__visual">
-        <div class="mk-actors__inspector-section" title="{{editor.labels.nameHint}}">
-          <label for="{{id}}-actor-name">{{editor.labels.name}}</label>
-          <input id="{{id}}-actor-name"
-                 name="actorName"
-                 type="text"
-                 value="{{editor.actorName}}"
-                 autocomplete="off"
-                 aria-describedby="{{id}}-actor-name-hint"
-                 required>
-          <p id="{{id}}-actor-name-hint" class="mk-actors__sr-only">{{editor.labels.nameHint}}</p>
+        <div class="mk-actors__inspector-section" title="{{editor.labels.imagePathPortraitNote}}">
+          <div class="mk-actors-token-editor__image-heading">
+            <label for="{{id}}-portrait-img">{{editor.labels.imagePath}}</label>
+            <span id="{{id}}-portrait-img-warning" class="mk-actors-token-editor__image-warning"
+                  data-role="token-image-warning" role="status" tabindex="0"
+                  title="{{editor.labels.imageLoadFailed}}" hidden>
+              <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+              <span class="mk-actors__sr-only">{{editor.labels.imageLoadFailed}}</span>
+            </span>
+          </div>
+          <div class="mk-actors-token-editor__row">
+            <input id="{{id}}-portrait-img"
+                   name="portraitImg"
+                   type="text"
+                   value="{{editor.portraitImage}}"
+                   aria-describedby="{{id}}-portrait-img-hint"
+                   aria-errormessage="{{id}}-portrait-img-warning"
+                   required>
+            <button type="button"
+                    class="mk-actors-token-editor__browse"
+                    data-action="browse-token-image"
+                    title="{{editor.labels.browseImage}}"
+                    aria-label="{{editor.labels.browseImage}}">
+              <i class="fas fa-folder-open"></i>
+            </button>
+          </div>
+          <p id="{{id}}-portrait-img-hint" class="mk-actors__sr-only">{{editor.labels.imagePathPortraitNote}}</p>
         </div>
 
         <div class="mk-actors__inspector-section" title="{{editor.labels.previewHint}}">
@@ -44,33 +61,16 @@
       </div>
 
       <div class="mk-actors-token-editor__settings">
-        <div class="mk-actors__inspector-section" title="{{editor.labels.imagePathPortraitNote}}">
-          <div class="mk-actors-token-editor__image-heading">
-            <label for="{{id}}-portrait-img">{{editor.labels.imagePath}}</label>
-            <span id="{{id}}-portrait-img-warning" class="mk-actors-token-editor__image-warning"
-                  data-role="token-image-warning" role="status" tabindex="0"
-                  title="{{editor.labels.imageLoadFailed}}" hidden>
-              <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-              <span class="mk-actors__sr-only">{{editor.labels.imageLoadFailed}}</span>
-            </span>
-          </div>
-          <div class="mk-actors-token-editor__row">
-            <input id="{{id}}-portrait-img"
-                   name="portraitImg"
-                   type="text"
-                   value="{{editor.portraitImage}}"
-                   aria-describedby="{{id}}-portrait-img-hint"
-                   aria-errormessage="{{id}}-portrait-img-warning"
-                   required>
-            <button type="button"
-                    class="mk-actors-token-editor__browse"
-                    data-action="browse-token-image"
-                    title="{{editor.labels.browseImage}}"
-                    aria-label="{{editor.labels.browseImage}}">
-              <i class="fas fa-folder-open"></i>
-            </button>
-          </div>
-          <p id="{{id}}-portrait-img-hint" class="mk-actors__sr-only">{{editor.labels.imagePathPortraitNote}}</p>
+        <div class="mk-actors__inspector-section" title="{{editor.labels.nameHint}}">
+          <label for="{{id}}-actor-name">{{editor.labels.name}}</label>
+          <input id="{{id}}-actor-name"
+                 name="actorName"
+                 type="text"
+                 value="{{editor.actorName}}"
+                 autocomplete="off"
+                 aria-describedby="{{id}}-actor-name-hint"
+                 required>
+          <p id="{{id}}-actor-name-hint" class="mk-actors__sr-only">{{editor.labels.nameHint}}</p>
         </div>
 
         <div class="mk-actors__inspector-section" title="{{editor.labels.fitModeHeightNote}}">

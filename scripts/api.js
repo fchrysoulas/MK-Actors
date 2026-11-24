@@ -27,4 +27,9 @@ export class MKActorsApi {
   static async resolveActor(uuid) {
     return resolveActor(uuid);
   }
+
+  static async openActorEditor(uuid) {
+    if (!this.app) this.app = new MKActorsApp();
+    return this.app.openTokenPortraitEditor(uuid);
+  }
 }

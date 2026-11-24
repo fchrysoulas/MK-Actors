@@ -8,6 +8,12 @@ This project follows semantic versioning where practical:
 - `MINOR` versions add backwards-compatible features.
 - `PATCH` versions fix bugs or polish existing behavior.
 
+## 0.11.0 - 2026-11-24
+
+- Swapped the Name and Image Path controls in Actor Editor: Image Path now sits above the preview, and Name starts the settings column.
+- Added **Open Actor Editor** to the Actors Directory context menu for Actors the user can update. The action supports Foundry v13-v14, reuses an existing editor window, and opens without displaying the gallery.
+- Shortened the README feature list into ten concise entries.
+
 ## 0.10.0 - 2026-11-24
 
 - Moved Actor Editor settings beside the image preview into the right third of the window, keeping Name above the image. Width/Height and anchor X/Y stay side by side, and setting descriptions appear on hover with screen-reader support.

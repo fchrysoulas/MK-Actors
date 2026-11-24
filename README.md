@@ -103,6 +103,8 @@ Then restart Foundry, enable **MK Actors** in your world, and open the gallery.
 - Dragging a compendium Actor onto a Scene follows Foundry's normal Actor drop behavior.
 - World Actors are shown to non-GM users only when they have at least Limited permission. Compendiums follow Foundry's pack visibility.
 - Right-clicking an Actor card opens the **Actor Editor** when the user can update that Actor. Right-clicking the same Actor again brings its existing popup to the front. The editor validates token dimensions, fit mode, anchor, and scale. The prototype token image path is synced from the portrait image automatically.
+- In Actor Editor, Image Path sits above the preview and Name is the first control in the settings column.
+- Right-click an Actor in Foundry's Actors Directory and choose **Open Actor Editor**. The option appears when you can update that Actor and reuses its existing editor window.
 - The gallery cache refreshes after Actor, Actor folder, or compendium changes. The Refresh button remains available for external changes which do not emit a Foundry document hook.
 - Preview anchor and scale fields update immediately during gestures, while visual redraws are batched. Closing the Actor Editor cancels pending preview redraws.
 - Refreshing while compendium indexes are loading discards outdated results and warnings. Concurrent gallery loads share the current index requests.

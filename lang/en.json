@@ -68,6 +68,8 @@
   "MKACTORS.CardHint": "Drag this card onto the scene. Double-click to open its sheet. Right-click to open the Actor Editor.",
   "MKACTORS.EditTokenPortrait": "Right-click to open the Actor Editor",
   "MKACTORS.TokenPortraitEditorTitle": "Actor Editor",
+  "MKACTORS.OpenActorEditor": "Open Actor Editor",
+  "MKACTORS.ActorEditorOpenFailed": "MK Actors | Could not open Actor Editor: {message}",
   "MKACTORS.Name": "Name",
   "MKACTORS.ActorNameHint": "Used for the Actor and new tokens placed on a Scene.",
   "MKACTORS.ActorNameRequired": "Please enter a name for the Actor and its token.",
