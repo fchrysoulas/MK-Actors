@@ -20,7 +20,7 @@ The module uses Foundry's standard Actor drag data shape, `{ type: "Actor", uuid
 - **Quick actions:** drag Actors onto a Scene, double-click to open sheets, or right-click for Actor Editor.
 - **Actor Editor:** edit names and artwork, and adjust token dimensions, fit, anchors, scale, and rotation with an interactive preview.
 - **Editor feedback:** setting tooltips, image-load warnings, and failed-save recovery keep editing clear and predictable.
-- **Actor import:** create world Actors from Foundry JSON with optional portrait and token image selection.
+- **Actor import:** create world Actors from Foundry JSON, or import a local folder of JSON exports and images together.
 - **Token shadows:** adjust size, offset, opacity, and blur using GM controls with a live preview.
 - **Responsive browsing:** load large libraries in batches, preserve scroll position, and customize card size.
 
@@ -45,6 +45,20 @@ Click **Import Actor** (the file-import icon) in the gallery toolbar, choose a F
 Click **Import Actor** to create a new world Actor with the exported character data, embedded Items, and effects. The gallery switches to World Actors and clears its filters after importing. Existing Actors are not overwritten; cancelling creates nothing. The button is available to users with Foundry's Actor creation permission.
 
 Use an Actor export compatible with the current game system. MK Actors checks the exported system and Actor type when available and uses Foundry's native document migration and validation. It does not convert characters between game systems. Images referenced by the JSON must be accessible in this Foundry installation or replaced using the image browser.
+
+### Import a local folder
+
+Click **Import Folder** (the folder-plus icon) in the gallery toolbar, then select a folder on your computer. MK Actors reads all subfolders and lists compatible Actor JSON exports, images, and invalid files before creating anything. Click **Import Folder** in that window to upload images and create the Actors. Non-Actor or incompatible JSON files are skipped with a reason; other file types are ignored. Supported images are APNG, AVIF, BMP, GIF, JPEG/JPG, PNG, SVG, TIFF, and WebP. Images alone are uploaded without creating Actors.
+
+The **Image upload folder** is relative to Foundry's User Data storage and defaults to `worlds/<world-id>/mk-actors-imports`. Each batch gets a new subfolder, preserving the selected folder structure and avoiding changes to existing artwork. Uploading images requires Foundry's file upload permission. Your original local files are unchanged.
+
+Image fields (`img`, `image`, `icon`, and `src`), including embedded Item and effect artwork, are updated when they match an uploaded image by relative path, selected folder path, or a unique filename. URL-encoded paths and Windows path separators are supported. Remote HTTP image URLs stay as exported. When neither the portrait nor token path matches, a unique image with the same base filename as the JSON supplies both. Ambiguous matches are flagged and left unchanged; unmatched references must already be accessible in Foundry.
+
+Progress and per-file results remain visible after importing. If an upload or Actor creation fails, click **Import Folder** again to retry the remaining files without duplicating successful Actors or uploads in that window. Actors referencing a failed local image wait for a successful upload. Selecting a folder again starts a new batch and may create additional Actors.
+
+### Move Actors between folders
+
+Drag a world Actor card onto an Actor folder in the **Sources** tree to move it there. Drop onto **World Actors** or **Unfiled** to remove its folder assignment. GMs can also see empty Actor folders as destinations. Moves require permission to update the Actor, and the tree counts and gallery refresh after a move. Compendium Actors remain in their packs. Dragging cards onto a Scene continues to use Foundry's normal token placement.
 
 ## Token shadows
 
@@ -129,6 +143,8 @@ mk-actors/
   scripts/actor-helpers.js
   scripts/actor-import.js
   scripts/actor-import-app.js
+  scripts/actor-folder-import.js
+  scripts/actor-folder-import-app.js
   scripts/api.js
   scripts/constants.js
   scripts/debug.js
@@ -148,10 +164,12 @@ mk-actors/
   styles/gallery.css
   templates/gallery.hbs
   templates/actor-import.hbs
+  templates/actor-folder-import.hbs
   templates/token-portrait-editor.hbs
   templates/token-shadow-settings.hbs
   tests/module.test.js
   tests/actor-import.test.js
+  tests/actor-folder-import.test.js
   tests/release.test.js
   tests/token-shadow-controls.test.js
   tests/token-shadow-preview.test.js

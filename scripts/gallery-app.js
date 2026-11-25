@@ -14,6 +14,7 @@ import { prepareWindowDrag } from "./window-drag.js";
 import { openTokenShadowSettings } from "./token-shadow-controls.js";
 import { canImportActors } from "./actor-import.js";
 import { MKActorImportApp } from "./actor-import-app.js";
+import { MKActorFolderImportApp } from "./actor-folder-import-app.js";
 
 export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -51,6 +52,8 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     this.savingFavorite = false;
     this.savingCompendiumPreference = false;
     this.actorImportApp = null;
+    this.actorFolderImportApp = null;
+    this.movingActors = new Set();
   }
 
   get title() {
@@ -184,6 +187,12 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
         ui.notifications.error(game.i18n.format("MKACTORS.ImportActorFailed", { message: error.message }));
       });
     });
+    root.querySelector?.("[data-action='import-folder']")?.addEventListener("click", () => {
+      void this.openActorImport({ folder: true }).catch((error) => {
+        console.error(`${MODULE_ID} | Could not open folder import.`, error);
+        ui.notifications.error(game.i18n.format("MKACTORS.ImportActorFailed", { message: error.message }));
+      });
+    });
 
     root.querySelector?.("[data-action='toggle-sources']")?.addEventListener("click", () => this.toggleSources(root));
     root.querySelector?.("[data-action='toggle-compendiums']")?.addEventListener("click", (event) => {
@@ -215,6 +224,19 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     });
 
     for (const button of root.querySelectorAll?.("[data-action='source-tree']") || []) {
+      if (this.isWorldFolderSource(button.dataset.source)) {
+        button.addEventListener("dragover", (event) => {
+          if (!Array.from(event.dataTransfer?.types ?? []).some((type) => ["text/plain", "application/json"].includes(type))) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.dataTransfer.dropEffect = "move";
+          button.classList.add("is-drop-target");
+        });
+        button.addEventListener("dragleave", (event) => {
+          if (!button.contains(event.relatedTarget)) button.classList.remove("is-drop-target");
+        });
+        button.addEventListener("drop", (event) => { void this.onSourceDrop(event); });
+      }
       button.addEventListener("click", (event) => {
         this.filters.source = event.currentTarget.dataset.source || "";
         void this.saveBrowsingPreferences();
@@ -243,6 +265,9 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
     for (const card of root.querySelectorAll?.("[data-action='drag-actor']") || []) {
       card.addEventListener("dragstart", this.onDragStart.bind(this));
+      card.addEventListener("dragend", () => {
+        for (const target of root.querySelectorAll(".is-drop-target")) target.classList.remove("is-drop-target");
+      });
       card.addEventListener("dblclick", this.onCardDoubleClick.bind(this));
       card.addEventListener("contextmenu", this.onCardContextMenu.bind(this));
     }
@@ -649,7 +674,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
       }
     ];
 
-    if (worldEntries.length) {
+    if (worldEntries.length || (game.settings.get(MODULE_ID, "includeWorldActors") && game.user?.isGM)) {
       tree.push({
         value: "world",
         label: game.i18n.localize("MKACTORS.World"),
@@ -715,7 +740,7 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     const visit = (parentId, depth) => {
       for (const folder of childrenByParent.get(parentId) || []) {
         const count = subtreeCounts.get(folder.id) || directCounts.get(folder.id) || 0;
-        if (!count) continue;
+        if (!count && !game.user?.isGM && folder.displayed !== true) continue;
 
         const value = `world-folder:${folder.id}`;
         items.push({
@@ -760,8 +785,52 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
 
     event.dataTransfer.setData("text/plain", serialized);
     event.dataTransfer.setData("application/json", serialized);
-    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.effectAllowed = "copyMove";
     debugLog("Actor drag started", { uuid });
+  }
+
+  isWorldFolderSource(source) {
+    return source === "world" || source === "world-unfiled" || source?.startsWith("world-folder:");
+  }
+
+  async onSourceDrop(event) {
+    const button = event.currentTarget;
+    const source = button.dataset.source;
+    if (!this.isWorldFolderSource(source)) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    button.classList.remove("is-drop-target");
+    let data;
+    try {
+      data = JSON.parse(event.dataTransfer.getData("text/plain") || event.dataTransfer.getData("application/json"));
+    } catch (_error) { return false; }
+    // Moving is only defined for world Actors; compendium documents remain in their packs.
+    if (data?.type !== "Actor" || typeof data.uuid !== "string" || !/^Actor\.[^.]+$/.test(data.uuid)) return false;
+    const actor = game.actors?.get(data.uuid.slice("Actor.".length));
+    if (!actor || actor.pack || !canModifyActor(actor)) {
+      ui.notifications.warn(localize("CannotMoveActor"));
+      return false;
+    }
+    const folderId = source.startsWith("world-folder:") ? source.slice("world-folder:".length) : "";
+    const folder = folderId ? this.getWorldActorFolderMap().get(folderId) : null;
+    if (folderId && (!folder || folder.pack)) {
+      ui.notifications.warn(localize("MoveActorFolderUnavailable"));
+      return false;
+    }
+    if (this.movingActors.has(actor.id) || this.getActorFolderId(actor) === folderId) return false;
+    this.movingActors.add(actor.id);
+    try {
+      await actor.update({ folder: folderId || null });
+      this.invalidateCache();
+      if (this.rendered) await this.render(false);
+      return true;
+    } catch (error) {
+      console.error(`${MODULE_ID} | Could not move Actor.`, error);
+      ui.notifications.error(game.i18n.format("MKACTORS.MoveActorFailed", { message: error.message }));
+      return false;
+    } finally {
+      this.movingActors.delete(actor.id);
+    }
   }
 
   async openActorSheet(uuid) {
@@ -808,17 +877,19 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
     grid.scrollTop += currentOffset - anchor.offset;
   }
 
-  async openActorImport() {
+  async openActorImport({ folder = false } = {}) {
     if (!canImportActors()) {
       ui.notifications.warn(localize("CannotImportActor"));
       return null;
     }
-    if (this.actorImportApp) {
-      await this.actorImportApp.maximize();
-      this.actorImportApp.bringToFront();
-      return this.actorImportApp;
+    const key = folder ? "actorFolderImportApp" : "actorImportApp";
+    if (this[key]) {
+      await this[key].maximize();
+      this[key].bringToFront();
+      return this[key];
     }
-    const app = new MKActorImportApp({
+    const ImportApp = folder ? MKActorFolderImportApp : MKActorImportApp;
+    const app = new ImportApp({
       onImport: async () => {
         clearTimeout(this.searchRenderTimer);
         this.filters = { search: "", type: "", source: "world" };
@@ -828,14 +899,14 @@ export class MKActorsApp extends foundry.applications.api.ApplicationV2 {
         this.pendingGridAnchor = null;
         if (this.rendered) await this.render(false);
       },
-      onClose: () => { this.actorImportApp = null; }
+      onClose: () => { this[key] = null; }
     });
-    this.actorImportApp = app;
+    this[key] = app;
     try {
       await app.render(true);
       return app;
     } catch (error) {
-      this.actorImportApp = null;
+      this[key] = null;
       throw error;
     }
   }

@@ -14,6 +14,10 @@
                   title="{{localize 'MKACTORS.ImportActor'}}" aria-label="{{localize 'MKACTORS.ImportActor'}}">
             <i class="fas fa-file-import" aria-hidden="true"></i>
           </button>
+          <button type="button" data-action="import-folder"
+                  title="{{localize 'MKACTORS.ImportFolder'}}" aria-label="{{localize 'MKACTORS.ImportFolder'}}">
+            <i class="fas fa-folder-plus" aria-hidden="true"></i>
+          </button>
         {{/if}}
         {{#if showTokenShadowSettings}}
           <button type="button" data-action="configure-token-shadows"

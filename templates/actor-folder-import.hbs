@@ -1,0 +1,27 @@
+<section class="mk-actors__inspector" aria-label="{{localize 'MKACTORS.ImportFolder'}}">
+  <form class="mk-actors__inspector-form">
+    <div class="mk-actors__inspector-scroll">
+      <div class="mk-actors__inspector-section">
+        <label for="mk-actors-import-folder">{{localize 'MKACTORS.ImportFolderLocal'}}</label>
+        <input id="mk-actors-import-folder" name="actorFolder" type="file" webkitdirectory directory multiple
+               aria-describedby="mk-actors-folder-hint" required>
+        <p id="mk-actors-folder-hint" class="notes">{{localize 'MKACTORS.ImportFolderHint'}}</p>
+      </div>
+      <div class="mk-actors__inspector-section">
+        <label for="mk-actors-upload-folder">{{localize 'MKACTORS.ImportFolderDestination'}}</label>
+        <input id="mk-actors-upload-folder" name="destination" type="text" value="{{destination}}"
+               aria-describedby="mk-actors-destination-hint" required>
+        <p id="mk-actors-destination-hint" class="notes">{{localize 'MKACTORS.ImportFolderDestinationHint'}}</p>
+        <p class="notes mk-actors__import-target" data-role="folder-target"></p>
+      </div>
+      <div class="mk-actors__inspector-section">
+        <p class="notes" data-role="folder-status" role="status" aria-live="polite">{{localize 'MKACTORS.ImportFolderSelect'}}</p>
+        <ul class="mk-actors__import-results" data-role="folder-results" aria-label="{{localize 'MKACTORS.ImportFolderResults'}}"></ul>
+      </div>
+    </div>
+    <footer class="mk-actors__inspector-footer">
+      <button type="button" data-action="cancel-import">{{localize 'MKACTORS.Close'}}</button>
+      <button type="submit" disabled><i class="fas fa-folder-plus" aria-hidden="true"></i>{{localize 'MKACTORS.ImportFolder'}}</button>
+    </footer>
+  </form>
+</section>

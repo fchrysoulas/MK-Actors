@@ -8,6 +8,11 @@ This project follows semantic versioning where practical:
 - `MINOR` versions add backwards-compatible features.
 - `PATCH` versions fix bugs or polish existing behavior.
 
+## 0.12.0 - 2026-11-25
+
+- Added local folder imports for Actor JSON exports and images, including subfolders, automatic image-path matching, file previews, progress, and retries that skip successful imports.
+- Added drag-and-drop moves from world Actor cards to folders in the Sources tree, with empty folder destinations for GMs and permission checks.
+
 ## 0.11.0 - 2026-11-24
 
 - Swapped the Name and Image Path controls in Actor Editor: Image Path now sits above the preview, and Name starts the settings column.

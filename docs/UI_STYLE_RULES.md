@@ -377,6 +377,13 @@ Recommended state behavior:
 - Preserve the draft on failure, prevent overlapping imports, and refresh the
   gallery to World Actors after success. Import compatible Actor exports using
   Foundry's native migrations without assuming a particular game system.
+- Offer a separate Import Folder action with a local directory picker, an image
+  upload destination, and per-file preview/progress. Do not upload or create
+  documents until submitted; keep results visible and skip successes on retry.
+- World Actor source rows accept Actor drops to change folder assignment and
+  show a clear drop outline. World/Unfiled removes the assignment. Show empty
+  Actor folders to GMs, preserve Scene placement drag data, and check update
+  permission before moving a world Actor.
 
 ## Scrollbars
 

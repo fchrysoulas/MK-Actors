@@ -141,6 +141,115 @@ test("Actor import respects creation permissions, reuses its window, and reveals
   assert.equal(render.mock.callCount(), 1);
   await app.close();
   assert.equal(gallery.actorImportApp, null);
+  const folderImport = await gallery.openActorImport({ folder: true });
+  assert.equal(await gallery.openActorImport({ folder: true }), folderImport);
+  assert.equal(folderImport.plan, null);
+  gallery.filters = { search: "old", type: "npc", source: "favorites" };
+  await folderImport.onImport();
+  assert.deepEqual(gallery.filters, { search: "", type: "", source: "world" });
+  await folderImport.close();
+  assert.equal(gallery.actorFolderImportApp, null);
+});
+
+function sourceDrop(source, data) {
+  return {
+    currentTarget: { dataset: { source }, classList: { remove() {} } },
+    dataTransfer: { getData: () => typeof data === "string" ? data : JSON.stringify(data) },
+    preventDefault() {}, stopPropagation() {}
+  };
+}
+
+test("world Actor drops move into folders and back to unfiled while preserving Scene drag data", async (t) => {
+  const priorActors = game.actors;
+  const priorFolders = game.folders;
+  const priorUser = game.user;
+  t.after(() => { game.actors = priorActors; game.folders = priorFolders; game.user = priorUser; });
+  game.user = { isGM: false };
+  const actor = { id: "one", uuid: "Actor.one", isOwner: true, folder: null,
+    update: async (changes) => { actor.folder = changes.folder; } };
+  game.actors = new Map([[actor.id, actor]]);
+  game.folders = { contents: [{ id: "destination", name: "Destination", type: "Actor" }] };
+  const app = new MKActorsApp();
+  app.rendered = true;
+  const render = t.mock.method(app, "render", async () => app);
+  const update = t.mock.method(actor, "update", actor.update);
+  assert.equal(await app.onSourceDrop(sourceDrop("world-folder:destination", { type: "Actor", uuid: actor.uuid })), true);
+  assert.deepEqual(update.mock.calls[0].arguments[0], { folder: "destination" });
+  assert.equal(render.mock.callCount(), 1);
+  assert.equal(app.cache, null);
+  assert.equal(await app.onSourceDrop(sourceDrop("world-unfiled", { type: "Actor", uuid: actor.uuid })), true);
+  assert.deepEqual(update.mock.calls[1].arguments[0], { folder: null });
+  actor.folder = "destination";
+  assert.equal(await app.onSourceDrop(sourceDrop("world", { type: "Actor", uuid: actor.uuid })), true);
+  const transfer = new Map();
+  const drag = { currentTarget: { dataset: { uuid: actor.uuid } }, dataTransfer: { setData: (type, value) => transfer.set(type, value) } };
+  app.onDragStart(drag);
+  assert.deepEqual(JSON.parse(transfer.get("text/plain")), { type: "Actor", uuid: "Actor.one" });
+  assert.equal(transfer.get("text/plain"), transfer.get("application/json"));
+  assert.equal(drag.dataTransfer.effectAllowed, "copyMove");
+});
+
+test("folder moves reject missing folders, non-world Actors, unrelated documents, and denied updates", async (t) => {
+  const priorActors = game.actors;
+  const priorFolders = game.folders;
+  const priorUser = game.user;
+  t.after(() => { game.actors = priorActors; game.folders = priorFolders; game.user = priorUser; });
+  const update = t.mock.fn();
+  const actor = { id: "one", uuid: "Actor.one", isOwner: false, update };
+  game.actors = new Map([[actor.id, actor]]);
+  game.folders = { contents: [{ id: "item", type: "Item" }] };
+  game.user = { isGM: false };
+  const app = new MKActorsApp();
+  const drop = (source = "world-folder:missing", data = { type: "Actor", uuid: actor.uuid }) => app.onSourceDrop(sourceDrop(source, data));
+  assert.equal(await drop(), false);
+  actor.isOwner = true;
+  assert.equal(await drop(), false);
+  assert.equal(await drop("world-folder:item"), false);
+  assert.equal(await drop("compendium:pack"), false);
+  assert.equal(await drop("world", { type: "Actor", uuid: "Compendium.pack.Actor.one" }), false);
+  assert.equal(await drop("world", { type: "Actor", uuid: "Scene.scene.Token.token.Actor.one" }), false);
+  assert.equal(await drop("world", { type: "Item", uuid: actor.uuid }), false);
+  assert.equal(await drop("world", "invalid json"), false);
+  assert.equal(await drop("world", { type: "Actor", uuid: "Actor.deleted" }), false);
+  assert.equal(update.mock.callCount(), 0);
+});
+
+test("overlapping moves are ignored and failed moves allow retry", async (t) => {
+  const priorActors = game.actors;
+  const priorUser = game.user;
+  t.after(() => { game.actors = priorActors; game.user = priorUser; });
+  game.user = { isGM: false };
+  const saving = deferred();
+  const update = t.mock.fn(() => saving.promise);
+  const actor = { id: "one", isOwner: true, folder: "old", update };
+  game.actors = new Map([[actor.id, actor]]);
+  const app = new MKActorsApp();
+  const event = sourceDrop("world", { type: "Actor", uuid: "Actor.one" });
+  const moving = app.onSourceDrop(event);
+  assert.equal(await app.onSourceDrop(event), false);
+  assert.equal(update.mock.callCount(), 1);
+  saving.reject(new Error("Permission changed"));
+  t.mock.method(console, "error", () => {});
+  assert.equal(await moving, false);
+  assert.equal(app.movingActors.size, 0);
+  update.mock.mockImplementation(async () => {});
+  assert.equal(await app.onSourceDrop(event), true);
+});
+
+test("empty Actor folders remain destinations for GMs without exposing hidden folders to players", (t) => {
+  const priorFolders = game.folders;
+  const priorUser = game.user;
+  t.after(() => { game.folders = priorFolders; game.user = priorUser; });
+  game.folders = { contents: [
+    { id: "empty", name: "Empty", type: "Actor" },
+    { id: "nested", name: "Nested", type: "Actor", folder: "empty" },
+    { id: "item", name: "Item", type: "Item" }
+  ] };
+  game.user = { isGM: true };
+  const app = new MKActorsApp();
+  assert.deepEqual(app.getWorldFolderTreeItems([], "").map((row) => row.value), ["world-folder:empty", "world-folder:nested"]);
+  game.user.isGM = false;
+  assert.deepEqual(app.getWorldFolderTreeItems([], ""), []);
 });
 
 function deferred() {
